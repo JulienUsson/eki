@@ -422,6 +422,7 @@ code { background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-
 
 .option .name { flex: 1; }
 .option .count { color: var(--muted); font-size: .8rem; }
+.option.create { width: 100%; margin-top: 10px; border-style: dashed; border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .option.selected { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 .option[hidden], .options[hidden], h4[hidden] { display: none; }
 

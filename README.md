@@ -4,6 +4,7 @@ PWA (installable sur téléphone, fonctionne hors ligne) pour planifier les repa
 
 - **📅 Semaine** : pour chaque jour, midi et soir, choisis un légume, un mode de cuisson, une protéine et un féculent.
   - **🎲 Compléter les trous** remplit les cases vides avec des propositions aléatoires : légumes de saison du mois de la semaine, cuisson adaptée au légume, et le moins de répétitions possible.
+  - Un légume, une protéine, un féculent ou une cuisson qui n'est pas dans la liste : tape son nom dans la recherche puis **➕ Ajouter « … »** ; il rejoint le catalogue (modifiable dans **Saison**).
   - **+ Autre** ajoute des ingrédients libres au repas (sauce tomate, parmesan…), qui partent aussi dans la liste de courses ; les ingrédients déjà utilisés sont proposés en un clic.
   - 🎲 sur un repas le complète (ou le re-tire s'il est déjà plein).
   - ⋯ → **👯 Cuisiner double** : choisis le créneau où vous mangerez la même chose ; il affiche « 🔁 Restes de lundi soir » et suit automatiquement les changements du repas d'origine. Le même lien se fait depuis le créneau des restes avec **🔁 Manger les restes d'un autre repas**.

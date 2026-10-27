@@ -463,12 +463,13 @@ function renderPicker() {
       <h3>${TYPES[field].emoji} ${TYPES[field].label} <small>${capitalize(day)} ${mealLabel}</small></h3>
       <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
     </div>
-    <input type="search" class="search" placeholder="Rechercher…" data-input="filter" autocomplete="off">
+    <input type="search" class="search" placeholder="Rechercher ou ajouter…" data-input="filter" autocomplete="off" enterkeyhint="done">
     <div class="toolbar">
       <button type="button" class="btn" data-action="choose-random">🎲 Au hasard</button>
       ${slot[field] ? '<button type="button" class="btn" data-action="choose" data-id="">Effacer</button>' : ''}
     </div>
     <div class="options-scroll">
+      <button type="button" class="option create" data-action="create-choose" hidden><span></span></button>
       ${groups.filter(([, items]) => items.length).map(([title, items]) => `
         ${title ? `<h4>${esc(title)}</h4>` : ''}
         <div class="options">${list(items)}</div>`).join('')}
@@ -588,6 +589,12 @@ function editItem(item, type) {
     </form>`);
 }
 
+function newItemId(name) {
+  const id = slugify(name) || 'item';
+  const taken = catalog().some((i) => i.id === id) || store.get('Catalogue', id);
+  return taken ? `${id}-${Math.random().toString(36).slice(2, 6)}` : id;
+}
+
 function catalogRow(item, patch = {}) {
   return {
     key: item.id,
@@ -680,6 +687,16 @@ const actions = {
     const { key, field } = ui.picker;
     commit('Repas', { ...cleanSlot(slotOf(key)), [field]: el.dataset.id });
     closeSheet();
+  },
+  'create-choose': () => {
+    const { key, field } = ui.picker;
+    const nom = $sheet.querySelector('[data-input="filter"]').value.trim();
+    if (!nom) return;
+    const id = newItemId(nom);
+    commit('Catalogue', { key: id, type: field, nom, emoji: TYPES[field].emoji, mois: [], cuissons: [], supprime: false });
+    commit('Repas', { ...cleanSlot(slotOf(key)), [field]: id });
+    closeSheet();
+    toast(`« ${nom} » ajouté au catalogue`);
   },
   'choose-random': () => {
     const { key, field } = ui.picker;
@@ -868,10 +885,7 @@ const forms = {
     if (!nom) return;
     const type = form.dataset.type;
     let id = form.dataset.id;
-    if (!id) {
-      id = slugify(nom) || 'item';
-      if (catalog().some((i) => i.id === id) || store.get('Catalogue', id)) id = `${id}-${Math.random().toString(36).slice(2, 6)}`;
-    }
+    id ||= newItemId(nom);
     commit('Catalogue', {
       key: id, type, nom,
       emoji: String(data.get('emoji') ?? '').trim(),
@@ -932,13 +946,26 @@ document.addEventListener('change', (event) => {
 document.addEventListener('input', (event) => {
   if (!event.target.matches('[data-input="filter"]')) return;
   const q = slugify(event.target.value);
-  for (const opt of $sheet.querySelectorAll('.option')) opt.hidden = Boolean(q) && !opt.dataset.search.includes(q);
+  const options = [...$sheet.querySelectorAll('.options .option')];
+  for (const opt of options) opt.hidden = Boolean(q) && !opt.dataset.search.includes(q);
+  const create = $sheet.querySelector('[data-action="create-choose"]');
+  create.hidden = !q || options.some((opt) => opt.dataset.search === q);
+  create.querySelector('span').textContent = `➕ Ajouter « ${event.target.value.trim()} »`;
   for (const group of $sheet.querySelectorAll('.options')) {
     const visible = [...group.children].some((c) => !c.hidden);
     group.hidden = !visible;
     const title = group.previousElementSibling;
     if (title?.tagName === 'H4') title.hidden = !visible;
   }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || !event.target.matches('[data-input="filter"]')) return;
+  event.preventDefault();
+  const create = $sheet.querySelector('[data-action="create-choose"]');
+  const visible = [...$sheet.querySelectorAll('.options .option')].filter((opt) => !opt.hidden && !opt.closest('[hidden]'));
+  if (!create.hidden) create.click();
+  else if (visible.length === 1) visible[0].click();
 });
 
 document.addEventListener('submit', (event) => {
