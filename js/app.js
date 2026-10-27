@@ -4,6 +4,7 @@ import {
   buildCatalog, byType, cuissonCandidates, emptySlot, fillSlot, fillWeek, inSeason,
   seasonalLegumes, shopKey, shoppingItems, shoppingText, slugify, weekSlots,
 } from './planner.js';
+import { buildInvite, hasInvite, parseInvite } from './invite.js';
 import { TABLE_NAMES } from './schema.js';
 import { Store } from './store.js';
 import { Sync } from './sync.js';
@@ -279,8 +280,8 @@ function renderSettings() {
       <h2>☁️ Partage via Google Sheets</h2>
       <p class="status ${sync.status === 'error' ? 'error' : ''}" data-sync-status>${syncStatusText()}</p>
       <form class="stack" data-form="sync">
-        <label>URL du script (…/exec)
-          <input name="url" type="url" value="${esc(url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+        <label>URL du script (…/exec) ou lien d’invitation
+          <input name="url" type="text" inputmode="url" value="${esc(url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
         </label>
         <label>Jeton secret
           <input name="token" type="text" value="${esc(token)}" placeholder="le TOKEN défini dans le script" autocomplete="off">
@@ -532,18 +533,8 @@ function listText() {
   return shoppingText(`Courses · semaine ${weekNumber(ui.week)} (${weekLabel(ui.week)})`, items, extras, checked);
 }
 
-function encodeInvite(settings) {
-  const json = JSON.stringify({ url: settings.url, token: settings.token });
-  return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function decodeInvite(code) {
-  const b64 = code.replace(/-/g, '+').replace(/_/g, '/');
-  return JSON.parse(decodeURIComponent(escape(atob(b64))));
-}
-
 function inviteLink() {
-  return `${location.origin}${location.pathname}#connect=${encodeInvite(store.settings)}`;
+  return buildInvite(`${location.origin}${location.pathname}`, store.settings);
 }
 
 function qrSvg(text) {
@@ -729,6 +720,14 @@ const forms = {
   sync: (form) => {
     const url = form.url.value.trim();
     const token = form.token.value.trim();
+    if (hasInvite(url)) {
+      try {
+        connectWith(parseInvite(url));
+      } catch (err) {
+        toast(`Lien d’invitation invalide : ${err.message}`);
+      }
+      return;
+    }
     if (url && !/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) {
       toast('L’URL doit commencer par https://script.google.com/');
       return;
@@ -839,29 +838,46 @@ window.addEventListener('beforeinstallprompt', (event) => {
   if (ui.tab === 'reglages') render();
 });
 
+function connectWith(invite) {
+  if (store.settings.url === invite.url && store.settings.token === invite.token) {
+    toast('Cet appareil est déjà connecté à ce planning');
+    return;
+  }
+  if (!confirm('Connecter cet appareil au planning partagé ?')) return;
+  store.updateSettings(invite);
+  ui.tab = 'semaine';
+  render(true);
+  toast('Connexion au planning partagé…');
+  sync.run().then(() => {
+    if (sync.status === 'error') toast(`Erreur de synchro : ${sync.error}`);
+  });
+}
+
 function handleInvite() {
-  const match = location.hash.match(/^#connect=([\w-]+)/);
-  if (!match) return;
+  const href = location.href;
+  if (!hasInvite(href)) return;
   history.replaceState(null, '', location.pathname + location.search);
+  let invite;
   try {
-    const { url, token } = decodeInvite(match[1]);
-    if (!url) return;
-    if (store.settings.url === url && store.settings.token === token) return;
-    if (!confirm('Connecter cet appareil au planning partagé ?')) return;
-    store.updateSettings({ url, token });
-    ui.tab = 'semaine';
-    toast('Connexion au planning partagé…');
-  } catch {
-    toast('Lien d’invitation invalide');
+    invite = parseInvite(href);
+  } catch (err) {
+    toast(`Lien d’invitation invalide : ${err.message}`);
+    return;
+  }
+  try {
+    connectWith(invite);
+  } catch (err) {
+    toast(`Connexion impossible : ${err.message}`);
   }
 }
 
 store.subscribe(render);
 sync.subscribe(renderBadge);
 
-handleInvite();
 render();
+handleInvite();
 sync.run();
+window.addEventListener('hashchange', handleInvite);
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') sync.run();

@@ -25,7 +25,7 @@ Les données sont enregistrées dans une feuille Google Sheets via un petit scri
 
    Copie l'URL qui se termine par `/exec`.
 6. Dans l'app : **Réglages → Partage via Google Sheets**, colle l'URL et le jeton, puis **Connecter**. Les données déjà saisies sur le téléphone sont envoyées dans la feuille.
-7. **🔗 Inviter** affiche un QR code et le lien d'invitation (bouton « Copier le lien ») : en scannant le QR code ou en ouvrant le lien, le téléphone de ta compagne se connecte à la même feuille.
+7. **🔗 Inviter** affiche un QR code et le lien d'invitation (bouton « Copier le lien ») : en scannant le QR code ou en ouvrant le lien, le téléphone de ta compagne se connecte à la même feuille. Si le lien ne s'ouvre pas correctement, colle-le dans **Réglages**, champ « URL du script ou lien d'invitation », puis **Connecter**.
 
 Pour utiliser une feuille existante, renseigne son identifiant (la partie entre `/d/` et `/edit` de son URL) dans `const SHEET_ID = '';`, ou ouvre le script depuis la feuille via **Extensions → Apps Script**.
 

@@ -1,4 +1,4 @@
-const CACHE = 'eki-v2';
+const CACHE = 'eki-v3';
 
 const ASSETS = [
   './',
@@ -8,6 +8,7 @@ const ASSETS = [
   'js/app.js',
   'js/data.js',
   'js/dates.js',
+  'js/invite.js',
   'js/planner.js',
   'js/schema.js',
   'js/store.js',
