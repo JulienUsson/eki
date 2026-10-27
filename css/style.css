@@ -409,6 +409,18 @@ code { background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-
 .menu { display: grid; gap: 6px; }
 .menu-item { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 14px; text-align: left; }
 
+.qr {
+  width: min(260px, 70vw);
+  margin: 4px auto 12px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 12px;
+}
+
+.qr svg { display: block; width: 100%; height: auto; }
+
+.invite-link { font-size: .85rem; color: var(--muted); }
+
 .copy-area { min-height: 240px; font-family: ui-monospace, monospace; font-size: .85rem; }
 
 .toast {

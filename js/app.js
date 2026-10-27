@@ -303,7 +303,7 @@ function renderSettings() {
           <li>Clique sur <b>Exécuter</b> (fonction <code>setup</code>) et autorise l’accès : la feuille « Eki · repas » est créée dans ton Drive.</li>
           <li><b>Déployer → Nouveau déploiement</b>, type <b>Application Web</b>, « Exécuter en tant que : <b>moi</b> », « Accès : <b>Tout le monde</b> ».</li>
           <li>Colle ici l’URL qui se termine par <code>/exec</code> et le jeton, puis <b>Connecter</b>.</li>
-          <li>Sur le téléphone de ta compagne : ouvre le lien du bouton <b>🔗 Inviter</b>.</li>
+          <li>Sur le téléphone de ta compagne : scanne le QR code du bouton <b>🔗 Inviter</b> (ou envoie-lui le lien).</li>
         </ol>
         <p class="hint">Les onglets <b>Repas</b>, <b>Catalogue</b> et <b>Courses</b> sont créés automatiquement. « Impossible d’ouvrir le fichier » : plusieurs comptes Google sont connectés, utilise une fenêtre de navigation privée avec un seul compte.</p>
       </details>
@@ -546,6 +546,28 @@ function inviteLink() {
   return `${location.origin}${location.pathname}#connect=${encodeInvite(store.settings)}`;
 }
 
+function qrSvg(text) {
+  const qr = globalThis.qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true, alt: 'QR code d’invitation' });
+}
+
+function inviteSheet() {
+  const link = inviteLink();
+  openSheet(`
+    <div class="sheet-head">
+      <h3>🔗 Inviter</h3>
+      <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
+    </div>
+    <p class="hint">Scanne ce QR code avec l’appareil photo de l’autre téléphone, ou envoie-lui le lien.</p>
+    <div class="qr">${qrSvg(link)}</div>
+    <input type="text" class="invite-link" value="${esc(link)}" readonly data-input="invite-link">
+    <div class="toolbar">
+      <button type="button" class="btn primary" data-action="copy-invite">📋 Copier le lien</button>
+    </div>`);
+}
+
 let installPrompt = null;
 
 const actions = {
@@ -652,8 +674,17 @@ const actions = {
     sync.run().then(() => toast(sync.status === 'error' ? `Erreur : ${sync.error}` : 'Synchronisé ✅'));
   },
   'share-access': () => {
-    if (!store.syncEnabled) return;
-    shareText(`Rejoins notre planning de repas sur Eki : ${inviteLink()}`, 'Eki · repas partagés');
+    if (store.syncEnabled) inviteSheet();
+  },
+  'copy-invite': async () => {
+    const input = $sheet.querySelector('[data-input="invite-link"]');
+    try {
+      await navigator.clipboard.writeText(input.value);
+      toast('Lien copié');
+    } catch {
+      input.select();
+      toast('Sélectionne le lien pour le copier');
+    }
   },
   disconnect: () => {
     if (!confirm('Déconnecter cet appareil de la feuille Google ? Les données restent sur l’appareil.')) return;

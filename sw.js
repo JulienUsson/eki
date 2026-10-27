@@ -1,4 +1,4 @@
-const CACHE = 'eki-v1';
+const CACHE = 'eki-v2';
 
 const ASSETS = [
   './',
@@ -12,6 +12,7 @@ const ASSETS = [
   'js/schema.js',
   'js/store.js',
   'js/sync.js',
+  'js/vendor/qrcode.js',
   'apps-script/Code.gs',
   'icons/icon.svg',
   'icons/icon-192.png',
