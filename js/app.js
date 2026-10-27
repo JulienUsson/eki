@@ -1,8 +1,8 @@
-import { DAYS, DEFAULT_CATALOG, MEALS, MONTHS, SHOPPING_TYPES, SHORT_MONTHS, SLOT_FIELDS, TYPES } from './data.js';
+import { AUTRE, DAYS, DEFAULT_CATALOG, MEALS, MONTHS, SHOPPING_GROUPS, SHORT_MONTHS, SLOT_FIELDS, TYPES, groupInfo } from './data.js';
 import { dayLabel, shiftWeek, weekDates, weekId, weekLabel, weekMonth, weekNumber } from './dates.js';
 import {
-  buildCatalog, byType, cuissonCandidates, emptySlot, fillSlot, fillWeek, inSeason,
-  seasonalLegumes, shopKey, shoppingItems, shoppingText, slugify, weekSlots,
+  buildCatalog, byType, cuissonCandidates, emptySlot, fillSlot, fillWeek, inSeason, isPlanned, parseItems,
+  seasonalLegumes, shopKey, shoppingItems, shoppingText, slotContent, slugify, weekSlots, weekUsage,
 } from './planner.js';
 import { buildInvite, hasInvite, parseInvite } from './invite.js';
 import { TABLE_NAMES } from './schema.js';
@@ -17,6 +17,7 @@ const ui = {
   week: weekId(),
   month: new Date().getMonth() + 1,
   picker: null,
+  reprise: null,
 };
 
 const $view = document.getElementById('view');
@@ -73,12 +74,35 @@ function isToday(d) {
 }
 
 function weekCounts(week) {
-  const counts = Object.fromEntries(SLOT_FIELDS.map((f) => [f, {}]));
-  for (const slot of weekSlots(week, store.table('Repas'), mealIds())) {
-    if (slot.libre) continue;
-    for (const f of SLOT_FIELDS) if (slot[f]) counts[f][slot[f]] = (counts[f][slot[f]] ?? 0) + 1;
+  const meals = store.table('Repas');
+  return weekUsage(weekSlots(week, meals, mealIds()), meals);
+}
+
+function slotLabel(key) {
+  const [, day, meal] = key.split('|');
+  return `${capitalize(day)} ${MEALS.find((m) => m.id === meal)?.label.toLowerCase() ?? meal}`;
+}
+
+function slotSummary(slot) {
+  const names = SLOT_FIELDS.map((f) => itemById(slot?.[f])?.name).filter(Boolean);
+  return [...names, ...parseItems(slot?.autres)].join(' · ');
+}
+
+function reprisesOf(key) {
+  return Object.values(store.table('Repas')).filter((row) => row.reprise === key && !row.libre);
+}
+
+function knownAutres() {
+  const counts = new Map();
+  for (const row of Object.values(store.table('Repas'))) {
+    for (const name of parseItems(row.autres)) {
+      const slug = slugify(name);
+      const entry = counts.get(slug) ?? { name, count: 0 };
+      entry.count += 1;
+      counts.set(slug, entry);
+    }
   }
-  return counts;
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'fr')).map((e) => e.name);
 }
 
 function weekNav() {
@@ -110,20 +134,35 @@ function renderWeek() {
   const ids = mealIds();
   const dates = weekDates(ui.week);
   const slots = weekSlots(ui.week, meals, ids);
-  const holes = slots.filter((s) => !s.libre && SLOT_FIELDS.some((f) => !s[f])).length;
+  const holes = slots.filter((s) => !s.libre && !s.reprise && SLOT_FIELDS.some((f) => !s[f])).length;
   const days = DAYS.map((day, i) => {
     const mealsHtml = ids.map((mealId) => {
       const slot = slots.find((s) => s.jour === day && s.repas === mealId);
       const meal = MEALS.find((m) => m.id === mealId);
-      const body = slot.libre
-        ? `<p class="libre-note">Repas libre (restes, resto, invités…)</p>`
-        : `<div class="chips">${SLOT_FIELDS.map((f) => chip(slot, f)).join('')}</div>`;
+      const twins = slot.reprise ? [] : reprisesOf(slot.key).filter((r) => r.semaine === ui.week);
+      let body;
+      if (slot.libre) {
+        body = `<p class="libre-note">Repas libre (resto, invités…)</p>`;
+      } else if (slot.reprise) {
+        const source = slotContent(slot, meals);
+        body = `
+          <button type="button" class="reprise" data-action="slot-menu" data-slot="${esc(slot.key)}">
+            <span>🔁 Restes de ${esc(slotLabel(slot.reprise).toLowerCase())}</span>
+            <small>${source ? esc(slotSummary(source)) || 'repas pas encore choisi' : 'repas d’origine introuvable'}</small>
+          </button>`;
+      } else {
+        const autres = parseItems(slot.autres);
+        body = `
+          <div class="chips">${SLOT_FIELDS.map((f) => chip(slot, f)).join('')}
+            <button type="button" class="chip chip-autre ${autres.length ? '' : 'empty'}" data-action="edit-autres" data-slot="${esc(slot.key)}">${autres.length ? `${AUTRE.emoji} ${esc(autres.join(', '))}` : `+ ${AUTRE.label}`}</button>
+          </div>`;
+      }
       return `
-        <div class="meal ${slot.libre ? 'is-libre' : ''}">
+        <div class="meal ${slot.libre ? 'is-libre' : ''} ${slot.reprise ? 'is-reprise' : ''}">
           <div class="meal-head">
-            <span class="meal-name">${meal.label}</span>
+            <span class="meal-name">${meal.label}${twins.length ? `<span class="twin" title="Cuisiné en double">👯 aussi ${esc(twins.map((t) => slotLabel(t.key).toLowerCase()).join(', '))}</span>` : ''}</span>
             <span class="meal-tools">
-              ${slot.libre ? '' : `<button type="button" class="icon-btn small" data-action="slot-dice" data-slot="${esc(slot.key)}" aria-label="Compléter ce repas au hasard">🎲</button>`}
+              ${slot.libre || slot.reprise ? '' : `<button type="button" class="icon-btn small" data-action="slot-dice" data-slot="${esc(slot.key)}" aria-label="Compléter ce repas au hasard">🎲</button>`}
               <button type="button" class="icon-btn small" data-action="slot-menu" data-slot="${esc(slot.key)}" aria-label="Options du repas">⋯</button>
             </span>
           </div>
@@ -214,13 +253,13 @@ function shoppingState(week) {
 function renderShopping() {
   const items = shoppingItems(ui.week, store.table('Repas'), catalog(), mealIds());
   const { checked, extras } = shoppingState(ui.week);
-  const groups = SHOPPING_TYPES.map((type) => {
+  const groups = SHOPPING_GROUPS.map((type) => {
     const group = items.filter((i) => i.type === type)
       .sort((a, b) => Number(checked.has(a.id)) - Number(checked.has(b.id)));
     if (!group.length) return '';
     return `
       <section class="block">
-        <h2>${TYPES[type].emoji} ${TYPES[type].plural}</h2>
+        <h2>${groupInfo(type).emoji} ${groupInfo(type).plural}</h2>
         <ul class="checklist">${group.map((item) => `
           <li class="${checked.has(item.id) ? 'done' : ''}">
             <label>
@@ -438,19 +477,78 @@ function renderPicker() {
 
 function slotMenu(key) {
   const slot = slotOf(key);
-  const [, day, meal] = key.split('|');
-  const mealLabel = MEALS.find((m) => m.id === meal)?.label.toLowerCase() ?? meal;
+  const item = (action, label) => `<button type="button" class="menu-item" data-action="${action}" data-slot="${esc(key)}">${label}</button>`;
+  const entries = [];
+  if (slot.reprise) {
+    entries.push(item('slot-clear', '✂️ Ne plus reprendre ce repas'));
+  } else if (!slot.libre) {
+    if (isPlanned(slot)) entries.push(item('twin-pick', '👯 Cuisiner double : reprendre sur un autre créneau…'));
+    entries.push(item('source-pick', '🔁 Manger les restes d’un autre repas…'));
+    entries.push(item('slot-reroll', '🎲 Tout re-tirer au hasard'));
+    entries.push(item('slot-clear', '🧹 Vider ce repas'));
+  }
+  entries.push(item('slot-libre', slot.libre ? '🍽️ Planifier ce repas' : '🚫 Repas libre (resto, invités…)'));
   openSheet(`
     <div class="sheet-head">
-      <h3>${capitalize(day)} ${mealLabel}</h3>
+      <h3>${slotLabel(key)}</h3>
       <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
     </div>
-    <div class="menu">
-      <button type="button" class="menu-item" data-action="slot-libre" data-slot="${esc(key)}">${slot.libre ? '🍽️ Planifier ce repas' : '🚫 Repas libre (restes, resto…)'}</button>
-      ${slot.libre ? '' : `
-        <button type="button" class="menu-item" data-action="slot-reroll" data-slot="${esc(key)}">🎲 Tout re-tirer au hasard</button>
-        <button type="button" class="menu-item" data-action="slot-clear" data-slot="${esc(key)}">🧹 Vider ce repas</button>`}
-    </div>`);
+    <div class="menu">${entries.join('')}</div>`);
+}
+
+function slotChoice(title, hint, action, from, candidates) {
+  const meals = store.table('Repas');
+  openSheet(`
+    <div class="sheet-head">
+      <h3>${title}</h3>
+      <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
+    </div>
+    <p class="hint">${hint}</p>
+    <div class="menu options-scroll">${candidates.length ? candidates.map((slot) => {
+      const content = slotContent(slot, meals);
+      const detail = slot.libre ? 'repas libre' : slot.reprise ? `restes de ${slotLabel(slot.reprise).toLowerCase()}` : slotSummary(content) || 'vide';
+      return `<button type="button" class="menu-item" data-action="${action}" data-from="${esc(from)}" data-to="${esc(slot.key)}">
+        <b>${slotLabel(slot.key)}</b><small>${esc(detail)}</small></button>`;
+    }).join('') : '<p class="hint">Aucun repas disponible cette semaine.</p>'}</div>`);
+}
+
+function twinPicker(key) {
+  const slot = slotOf(key);
+  const slots = weekSlots(slot.semaine, store.table('Repas'), mealIds());
+  const at = slots.findIndex((s) => s.key === key);
+  const sorted = [...slots.slice(at + 1), ...slots.slice(0, at).reverse()];
+  slotChoice('👯 Cuisiner double', `On mange la même chose que ${esc(slotLabel(key).toLowerCase())} sur quel créneau ?`, 'twin-set', key, sorted);
+}
+
+function sourcePicker(key) {
+  const slot = slotOf(key);
+  const slots = weekSlots(slot.semaine, store.table('Repas'), mealIds());
+  const at = slots.findIndex((s) => s.key === key);
+  const candidates = [...slots.slice(0, at).reverse(), ...slots.slice(at + 1)].filter(isPlanned);
+  slotChoice('🔁 Restes', `${esc(slotLabel(key))} : on mange les restes de quel repas ?`, 'twin-set', '', candidates);
+}
+
+function autresEditor(key) {
+  const slot = slotOf(key);
+  const current = parseItems(slot.autres);
+  const suggestions = knownAutres().filter((name) => !current.some((c) => slugify(c) === slugify(name))).slice(0, 24);
+  openSheet(`
+    <div class="sheet-head">
+      <h3>${AUTRE.emoji} Autres ingrédients <small>${slotLabel(key)}</small></h3>
+      <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
+    </div>
+    <form class="stack" data-form="autres" data-slot="${esc(key)}">
+      <label>Séparés par des virgules (ils s’ajoutent à la liste de courses)
+        <textarea name="autres" rows="2" placeholder="sauce tomate, parmesan, basilic…">${esc(current.join(', '))}</textarea>
+      </label>
+      ${suggestions.length ? `<div class="tags">${suggestions.map((name) => `
+        <button type="button" class="tag" data-action="add-autre" data-name="${esc(name)}">+ ${esc(name)}</button>`).join('')}</div>` : ''}
+      <div class="toolbar">
+        <button type="submit" class="btn primary">Enregistrer</button>
+        ${current.length ? '<button type="button" class="btn" data-action="clear-autres">Effacer</button>' : ''}
+      </div>
+    </form>`);
+  if (!current.length) $sheet.querySelector('textarea').focus();
 }
 
 function editItem(item, type) {
@@ -572,7 +670,7 @@ const actions = {
   },
   'clear-week': () => {
     const slots = weekSlots(ui.week, store.table('Repas'), mealIds())
-      .filter((s) => s.libre || SLOT_FIELDS.some((f) => s[f]));
+      .filter((s) => s.libre || s.reprise || isPlanned(s));
     if (!slots.length) return;
     if (!confirm('Vider tous les repas de cette semaine ?')) return;
     commit('Repas', slots.map((s) => emptySlot(s.semaine, s.jour, s.repas)));
@@ -601,6 +699,29 @@ const actions = {
     commit('Repas', fillSlot(base, catalog(), weekMonth(slot.semaine), counts, empty ? null : slot));
   },
   'slot-menu': (el) => slotMenu(el.dataset.slot),
+  'twin-pick': (el) => twinPicker(el.dataset.slot),
+  'source-pick': (el) => { ui.reprise = el.dataset.slot; sourcePicker(el.dataset.slot); },
+  'twin-set': (el) => {
+    const pickedSource = !el.dataset.from;
+    const sourceKey = pickedSource ? el.dataset.to : el.dataset.from;
+    const targetKey = pickedSource ? ui.reprise : el.dataset.to;
+    const target = slotOf(targetKey);
+    const moved = reprisesOf(targetKey).map((row) => ({ ...cleanSlot(row), reprise: sourceKey }));
+    commit('Repas', [{ ...emptySlot(target.semaine, target.jour, target.repas), reprise: sourceKey }, ...moved]);
+    closeSheet();
+    toast(`👯 ${slotLabel(targetKey)} : restes de ${slotLabel(sourceKey).toLowerCase()}`);
+  },
+  'edit-autres': (el) => autresEditor(el.dataset.slot),
+  'add-autre': (el) => {
+    const area = $sheet.querySelector('textarea[name="autres"]');
+    area.value = [...parseItems(area.value), el.dataset.name].join(', ');
+    el.remove();
+  },
+  'clear-autres': () => {
+    const form = $sheet.querySelector('form[data-form="autres"]');
+    commit('Repas', { ...cleanSlot(slotOf(form.dataset.slot)), autres: [] });
+    closeSheet();
+  },
   'slot-libre': (el) => {
     const slot = cleanSlot(slotOf(el.dataset.slot));
     commit('Repas', { ...slot, libre: !slot.libre });
@@ -709,6 +830,10 @@ const actions = {
 };
 
 const forms = {
+  autres: (form) => {
+    commit('Repas', { ...cleanSlot(slotOf(form.dataset.slot)), autres: parseItems(form.autres.value) });
+    closeSheet();
+  },
   'add-extra': (form) => {
     const article = form.article.value.trim();
     if (!article) return;

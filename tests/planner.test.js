@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCatalog, byType, cuissonCandidates, fillWeek, inSeason, shoppingItems, shoppingText, slotKey, slugify,
+  buildCatalog, byType, cuissonCandidates, emptySlot, fillWeek, inSeason, isPlanned, shoppingItems, shoppingText,
+  slotContent, slotKey, slugify, weekUsage,
 } from '../js/planner.js';
 
 const seeded = (seed = 1) => () => {
@@ -95,4 +96,41 @@ test('shopping list aggregates ingredients and skips libre meals', () => {
   assert.doesNotMatch(text, /Poulet/);
   assert.match(text, /- Lait/);
   assert.doesNotMatch(text, /Pain/);
+});
+
+test('free ingredients and leftovers are part of the shopping list', () => {
+  const catalog = buildCatalog();
+  const week = '2026-W44';
+  const lundi = {
+    key: slotKey(week, 'lundi', 'soir'), semaine: week, jour: 'lundi', repas: 'soir',
+    legume: 'poireau', cuisson: 'soupe', proteine: 'oeufs', feculent: 'pain', libre: false,
+    autres: ['Crème fraîche', 'ciboulette'], reprise: '',
+  };
+  const mardi = { ...emptySlot(week, 'mardi', 'midi'), reprise: lundi.key, legume: 'navet' };
+  const mercredi = { ...emptySlot(week, 'mercredi', 'midi'), autres: ['crème fraiche'] };
+  const meals = Object.fromEntries([lundi, mardi, mercredi].map((r) => [r.key, r]));
+  const items = shoppingItems(week, meals, catalog, ['midi', 'soir']);
+  const count = (id) => items.find((i) => i.id === id)?.count;
+  assert.equal(count('poireau'), 2);
+  assert.equal(count('navet'), undefined);
+  assert.equal(count('a:creme-fraiche'), 3);
+  assert.equal(count('a:ciboulette'), 2);
+  assert.equal(items.at(-1).type, 'autre');
+  assert.match(shoppingText('Courses', items, [], new Set()), /🧺 Autres ingrédients\n- (Crème fraîche|ciboulette)/);
+});
+
+test('fillWeek leaves leftovers alone and counts them for variety', () => {
+  const catalog = buildCatalog();
+  const week = '2026-W44';
+  const source = { ...emptySlot(week, 'lundi', 'soir'), legume: 'poireau', cuisson: 'soupe', proteine: 'oeufs', feculent: 'pain' };
+  const leftover = { ...emptySlot(week, 'mardi', 'midi'), reprise: source.key };
+  const meals = { [source.key]: source, [leftover.key]: leftover };
+  const changed = fillWeek(week, meals, catalog, ['midi', 'soir'], seeded(7));
+  assert.equal(changed.length, 12);
+  assert.ok(!changed.some((s) => s.key === leftover.key));
+  assert.ok(!changed.some((s) => s.legume === 'poireau'));
+  assert.equal(slotContent(leftover, meals), source);
+  assert.equal(isPlanned(leftover), false);
+  assert.equal(isPlanned({ ...emptySlot(week, 'jeudi', 'midi'), autres: ['pizza'] }), true);
+  assert.deepEqual(weekUsage([source, leftover], meals).proteine, { oeufs: 2 });
 });

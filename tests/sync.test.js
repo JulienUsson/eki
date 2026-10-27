@@ -38,6 +38,14 @@ test('sheet row round trip', () => {
   assert.deepEqual(fromSheetRow('Catalogue', sheet), row);
 });
 
+test('free ingredients keep their spaces in the sheet', () => {
+  const row = { key: 'w|lundi|soir', semaine: 'w', jour: 'lundi', repas: 'soir', legume: '', cuisson: '', proteine: '', feculent: '', libre: false, autres: ['sauce tomate', 'parmesan'], reprise: 'w|dimanche|soir', updatedAt: 3 };
+  const sheet = toSheetRow('Repas', row);
+  assert.equal(sheet.autres, 'sauce tomate, parmesan');
+  assert.deepEqual(fromSheetRow('Repas', sheet), row);
+  assert.deepEqual(fromSheetRow('Repas', { key: 'k', autres: 'pain de mie;\nbeurre ' }).autres, ['pain de mie', 'beurre']);
+});
+
 test('rows typed by hand in the sheet are understood', () => {
   const data = fromSheetData({ Catalogue: [{ nom: 'Céleri branche', type: 'legume', mois: '7;8 9', supprime: 'non' }, { nom: '' }] });
   const row = data.Catalogue['celeri-branche'];

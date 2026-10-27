@@ -9,6 +9,12 @@ export const SLOT_FIELDS = ['legume', 'cuisson', 'proteine', 'feculent'];
 
 export const SHOPPING_TYPES = ['legume', 'proteine', 'feculent'];
 
+export const AUTRE = { label: 'Autre', plural: 'Autres ingrédients', emoji: '🧺' };
+
+export const SHOPPING_GROUPS = [...SHOPPING_TYPES, 'autre'];
+
+export const groupInfo = (type) => TYPES[type] ?? AUTRE;
+
 export const MONTHS = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',

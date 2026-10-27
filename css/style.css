@@ -218,7 +218,26 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; outline: none; }
 .chip-proteine { background: var(--proteine); }
 .chip-feculent { background: var(--feculent); }
 
+.chip-autre { grid-column: 1 / -1; background: var(--surface-2); }
+
 .chip.empty { background: transparent; border: 1px dashed var(--border); color: var(--muted); }
+.chip-autre.empty { min-height: 0; padding: 2px 4px; border: 0; background: none; font-size: .85rem; }
+
+.twin { margin-left: 8px; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--accent); }
+
+.reprise {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.reprise small { color: var(--muted); }
 .chip.warn { border-color: var(--warn); }
 
 .meal.is-libre .libre-note { margin: 4px 0 0; color: var(--muted); font-style: italic; font-size: .92rem; }
@@ -320,7 +339,7 @@ input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px
 
 .stack { display: grid; gap: 12px; }
 .stack label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); }
-.stack label input { color: var(--text); font-size: 1rem; }
+.stack label input, .stack label textarea { color: var(--text); font-size: 1rem; }
 
 .row { display: flex; gap: 10px; }
 .row .grow { flex: 1; }
@@ -408,6 +427,8 @@ code { background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-
 
 .menu { display: grid; gap: 6px; }
 .menu-item { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 14px; text-align: left; }
+.menu-item small { display: block; color: var(--muted); margin-top: 2px; }
+textarea { resize: vertical; }
 
 .qr {
   width: min(260px, 70vw);

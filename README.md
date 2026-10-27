@@ -4,9 +4,12 @@ PWA (installable sur téléphone, fonctionne hors ligne) pour planifier les repa
 
 - **📅 Semaine** : pour chaque jour, midi et soir, choisis un légume, un mode de cuisson, une protéine et un féculent.
   - **🎲 Compléter les trous** remplit les cases vides avec des propositions aléatoires : légumes de saison du mois de la semaine, cuisson adaptée au légume, et le moins de répétitions possible.
-  - 🎲 sur un repas le complète (ou le re-tire s'il est déjà plein), ⋯ permet de le marquer « repas libre » (restes, resto…) pour qu'il soit ignoré.
+  - **+ Autre** ajoute des ingrédients libres au repas (sauce tomate, parmesan…), qui partent aussi dans la liste de courses ; les ingrédients déjà utilisés sont proposés en un clic.
+  - 🎲 sur un repas le complète (ou le re-tire s'il est déjà plein).
+  - ⋯ → **👯 Cuisiner double** : choisis le créneau où vous mangerez la même chose ; il affiche « 🔁 Restes de lundi soir » et suit automatiquement les changements du repas d'origine. Le même lien se fait depuis le créneau des restes avec **🔁 Manger les restes d'un autre repas**.
+  - ⋯ → **Repas libre** (resto, invités…) pour qu'un créneau soit ignoré.
 - **🥕 Saison** : légumes de saison mois par mois avec leurs cuissons adaptées, et le catalogue des cuissons, protéines et féculents. Tout est modifiable (ajout, édition, suppression).
-- **🛒 Courses** : liste de courses générée depuis la semaine (avec le nombre de repas par ingrédient), à cocher au magasin, avec des articles divers en plus. Partage / copie en texte.
+- **🛒 Courses** : liste de courses générée depuis la semaine (avec le nombre de repas par ingrédient, restes compris), à cocher au magasin, avec des articles divers en plus. Partage / copie en texte.
 - **⚙️ Réglages** : partage via Google Sheets, repas à planifier (midi / soir), export / import JSON.
 
 Aucune dépendance, aucun build : HTML + CSS + modules JavaScript.
@@ -35,7 +38,7 @@ La feuille contient trois onglets créés automatiquement :
 
 | Onglet | Contenu |
 | --- | --- |
-| `Repas` | une ligne par repas planifié (`semaine`, `jour`, `repas`, `legume`, `cuisson`, `proteine`, `feculent`, `libre`) |
+| `Repas` | une ligne par repas planifié (`semaine`, `jour`, `repas`, `legume`, `cuisson`, `proteine`, `feculent`, `libre`, `autres`, `reprise`) |
 | `Catalogue` | les ingrédients ajoutés, modifiés ou supprimés par rapport au catalogue par défaut |
 | `Courses` | articles cochés et articles divers de la liste de courses |
 

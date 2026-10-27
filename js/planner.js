@@ -1,4 +1,4 @@
-import { DEFAULT_CATALOG, DAYS, SLOT_FIELDS, SHOPPING_TYPES, TYPES } from './data.js';
+import { DEFAULT_CATALOG, DAYS, SLOT_FIELDS, SHOPPING_GROUPS, SHOPPING_TYPES, groupInfo } from './data.js';
 import { weekMonth } from './dates.js';
 
 export function slugify(text) {
@@ -9,6 +9,11 @@ export function slugify(text) {
     .replace(/œ/g, 'oe')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+export function parseItems(value) {
+  const list = Array.isArray(value) ? value : String(value ?? '').split(/[,;\n]+/);
+  return list.map((item) => String(item).trim()).filter(Boolean);
 }
 
 export function buildCatalog(overrides = {}) {
@@ -29,7 +34,7 @@ export function buildCatalog(overrides = {}) {
       custom: !DEFAULT_CATALOG.some((d) => d.id === row.key),
     });
   }
-  const list = [...items.values()].filter((item) => TYPES[item.type]);
+  const list = [...items.values()].filter((item) => SLOT_FIELDS.includes(item.type));
   list.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   return list;
 }
@@ -47,7 +52,33 @@ export function slotKey(week, day, meal) {
 }
 
 export function emptySlot(week, day, meal) {
-  return { key: slotKey(week, day, meal), semaine: week, jour: day, repas: meal, legume: '', cuisson: '', proteine: '', feculent: '', libre: false };
+  return {
+    key: slotKey(week, day, meal), semaine: week, jour: day, repas: meal,
+    legume: '', cuisson: '', proteine: '', feculent: '', libre: false, autres: [], reprise: '',
+  };
+}
+
+export function isPlanned(slot) {
+  return !slot.libre && !slot.reprise && (SLOT_FIELDS.some((f) => slot[f]) || parseItems(slot.autres).length > 0);
+}
+
+export function slotContent(slot, meals) {
+  if (!slot || slot.libre) return null;
+  if (!slot.reprise) return slot;
+  const source = meals[slot.reprise];
+  return source && !source.libre && !source.reprise ? source : null;
+}
+
+export function weekUsage(slots, meals) {
+  const counts = Object.fromEntries(SLOT_FIELDS.map((field) => [field, {}]));
+  for (const slot of slots) {
+    const content = slotContent(slot, meals);
+    if (!content) continue;
+    for (const field of SLOT_FIELDS) {
+      if (content[field]) counts[field][content[field]] = (counts[field][content[field]] ?? 0) + 1;
+    }
+  }
+  return counts;
 }
 
 export function weekSlots(week, meals, mealIds) {
@@ -101,17 +132,11 @@ export function fillSlot(slot, catalog, month, counts, previous, rng = Math.rand
 export function fillWeek(week, meals, catalog, mealIds, rng = Math.random) {
   const slots = weekSlots(week, meals, mealIds);
   const month = weekMonth(week);
-  const counts = Object.fromEntries(SLOT_FIELDS.map((field) => [field, {}]));
-  for (const slot of slots) {
-    if (slot.libre) continue;
-    for (const field of SLOT_FIELDS) {
-      if (slot[field]) counts[field][slot[field]] = (counts[field][slot[field]] ?? 0) + 1;
-    }
-  }
+  const counts = weekUsage(slots, meals);
   const changed = [];
   let previous = null;
   for (const slot of slots) {
-    if (slot.libre) continue;
+    if (slot.libre || slot.reprise) continue;
     const filled = fillSlot(slot, catalog, month, counts, previous, rng);
     if (SLOT_FIELDS.some((field) => filled[field] !== slot[field])) changed.push(filled);
     previous = filled;
@@ -122,17 +147,24 @@ export function fillWeek(week, meals, catalog, mealIds, rng = Math.random) {
 export function shoppingItems(week, meals, catalog, mealIds) {
   const index = new Map(catalog.map((item) => [item.id, item]));
   const totals = new Map();
+  const add = (id, base) => {
+    const entry = totals.get(id) ?? { ...base, id, count: 0 };
+    entry.count += 1;
+    totals.set(id, entry);
+  };
   for (const slot of weekSlots(week, meals, mealIds)) {
-    if (slot.libre) continue;
+    const content = slotContent(slot, meals);
+    if (!content) continue;
     for (const type of SHOPPING_TYPES) {
-      const item = index.get(slot[type]);
-      if (!item) continue;
-      const entry = totals.get(item.id) ?? { ...item, count: 0 };
-      entry.count += 1;
-      totals.set(item.id, entry);
+      const item = index.get(content[type]);
+      if (item) add(item.id, item);
+    }
+    for (const name of parseItems(content.autres)) {
+      const slug = slugify(name);
+      if (slug) add(`a:${slug}`, { type: 'autre', name, emoji: groupInfo('autre').emoji });
     }
   }
-  const order = Object.fromEntries(SHOPPING_TYPES.map((type, i) => [type, i]));
+  const order = Object.fromEntries(SHOPPING_GROUPS.map((type, i) => [type, i]));
   return [...totals.values()].sort((a, b) => order[a.type] - order[b.type] || a.name.localeCompare(b.name, 'fr'));
 }
 
@@ -142,10 +174,10 @@ export function shopKey(week, id) {
 
 export function shoppingText(title, items, extras, checked) {
   const lines = [title];
-  for (const type of SHOPPING_TYPES) {
+  for (const type of SHOPPING_GROUPS) {
     const group = items.filter((item) => item.type === type && !checked.has(item.id));
     if (!group.length) continue;
-    lines.push('', `${TYPES[type].emoji} ${TYPES[type].plural}`);
+    lines.push('', `${groupInfo(type).emoji} ${groupInfo(type).plural}`);
     for (const item of group) lines.push(`- ${item.name}${item.count > 1 ? ` (×${item.count})` : ''}`);
   }
   const otherExtras = extras.filter((row) => !row.coche);
