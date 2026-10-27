@@ -116,9 +116,8 @@ export function seasonalLegumes(catalog, month) {
 export function fillSlot(slot, catalog, month, counts, previous, rng = Math.random) {
   const next = { ...slot };
   const ids = (type) => byType(catalog, type).map((item) => item.id);
-  const known = new Set(catalog.map((item) => item.id));
   const take = (field, candidates) => {
-    if (next[field] && known.has(next[field])) return;
+    if (next[field]) return;
     next[field] = pickLeastUsed(candidates, counts[field], previous?.[field], rng);
     if (next[field]) counts[field][next[field]] = (counts[field][next[field]] ?? 0) + 1;
   };
@@ -156,8 +155,10 @@ export function shoppingItems(week, meals, catalog, mealIds) {
     const content = slotContent(slot, meals);
     if (!content) continue;
     for (const type of SHOPPING_TYPES) {
-      const item = index.get(content[type]);
+      const value = content[type];
+      const item = index.get(value);
       if (item) add(item.id, item);
+      else if (value && slugify(value)) add(`t:${type}:${slugify(value)}`, { type, name: value, emoji: groupInfo(type).emoji });
     }
     for (const name of parseItems(content.autres)) {
       const slug = slugify(name);

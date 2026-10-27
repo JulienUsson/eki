@@ -134,3 +134,20 @@ test('fillWeek leaves leftovers alone and counts them for variety', () => {
   assert.equal(isPlanned({ ...emptySlot(week, 'jeudi', 'midi'), autres: ['pizza'] }), true);
   assert.deepEqual(weekUsage([source, leftover], meals).proteine, { oeufs: 2 });
 });
+
+test('one-off ingredients typed in a meal are kept and shopped', () => {
+  const catalog = buildCatalog();
+  const week = '2026-W44';
+  const slot = { ...emptySlot(week, 'lundi', 'midi'), legume: 'Pâtisson', proteine: 'Seitan' };
+  const meals = { [slot.key]: slot };
+  const changed = fillWeek(week, meals, catalog, ['midi'], seeded(5));
+  const lundi = changed.find((s) => s.key === slot.key);
+  assert.equal(lundi.legume, 'Pâtisson');
+  assert.equal(lundi.proteine, 'Seitan');
+  assert.ok(lundi.cuisson && lundi.feculent);
+  const items = shoppingItems(week, { [slot.key]: lundi }, catalog, ['midi']);
+  const patisson = items.find((i) => i.id === 't:legume:patisson');
+  assert.equal(patisson.name, 'Pâtisson');
+  assert.equal(patisson.type, 'legume');
+  assert.ok(items.some((i) => i.id === 't:proteine:seitan' && i.type === 'proteine'));
+});

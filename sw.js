@@ -1,4 +1,4 @@
-const CACHE = 'eki-v5';
+const CACHE = 'eki-v6';
 
 const ASSETS = [
   './',

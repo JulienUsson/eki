@@ -84,7 +84,7 @@ function slotLabel(key) {
 }
 
 function slotSummary(slot) {
-  const names = SLOT_FIELDS.map((f) => itemById(slot?.[f])?.name).filter(Boolean);
+  const names = SLOT_FIELDS.map((f) => itemById(slot?.[f])?.name ?? slot?.[f]).filter(Boolean);
   return [...names, ...parseItems(slot?.autres)].join(' · ');
 }
 
@@ -123,9 +123,10 @@ function chip(slot, field) {
   const month = weekMonth(slot.semaine);
   const off = item && field === 'legume' && !inSeason(item, month);
   const mismatch = item && field === 'cuisson' && slot.legume && !cuissonCandidates(catalog(), slot.legume).includes(item.id);
-  const cls = ['chip', `chip-${field}`, item ? '' : 'empty', off ? 'warn' : '', mismatch ? 'warn' : ''].join(' ');
-  const label = item ? `${item.emoji} ${esc(item.name)}` : `+ ${TYPES[field].label}`;
-  const title = off ? ' title="Hors saison"' : mismatch ? ' title="Cuisson peu adaptée à ce légume"' : '';
+  const free = !item && slot[field];
+  const cls = ['chip', `chip-${field}`, item || free ? '' : 'empty', off ? 'warn' : '', mismatch ? 'warn' : ''].join(' ');
+  const label = item ? `${item.emoji} ${esc(item.name)}` : free ? `✏️ ${esc(slot[field])}` : `+ ${TYPES[field].label}`;
+  const title = off ? ' title="Hors saison"' : mismatch ? ' title="Cuisson peu adaptée à ce légume"' : free ? ' title="Hors catalogue"' : '';
   return `<button type="button" class="${cls}" data-action="pick" data-slot="${esc(slot.key)}" data-field="${field}"${title}>${label}</button>`;
 }
 
@@ -263,7 +264,7 @@ function renderShopping() {
         <ul class="checklist">${group.map((item) => `
           <li class="${checked.has(item.id) ? 'done' : ''}">
             <label>
-              <input type="checkbox" data-action="toggle-shop" data-id="${esc(item.id)}" ${checked.has(item.id) ? 'checked' : ''}>
+              <input type="checkbox" data-action="toggle-shop" data-id="${esc(item.id)}" data-name="${esc(item.name)}" ${checked.has(item.id) ? 'checked' : ''}>
               <span class="emoji">${item.emoji}</span>
               <span class="name">${esc(item.name)}</span>
               <span class="qty">${item.count} repas</span>
@@ -469,7 +470,10 @@ function renderPicker() {
       ${slot[field] ? '<button type="button" class="btn" data-action="choose" data-id="">Effacer</button>' : ''}
     </div>
     <div class="options-scroll">
-      <button type="button" class="option create" data-action="create-choose" hidden><span></span></button>
+      <div class="create-row" data-create hidden>
+        <button type="button" class="option create" data-action="create-choose"><span></span></button>
+        <button type="button" class="option create once" data-action="free-choose"><span></span></button>
+      </div>
       ${groups.filter(([, items]) => items.length).map(([title, items]) => `
         ${title ? `<h4>${esc(title)}</h4>` : ''}
         <div class="options">${list(items)}</div>`).join('')}
@@ -698,6 +702,13 @@ const actions = {
     closeSheet();
     toast(`« ${nom} » ajouté au catalogue`);
   },
+  'free-choose': () => {
+    const { key, field } = ui.picker;
+    const nom = $sheet.querySelector('[data-input="filter"]').value.trim();
+    if (!nom) return;
+    commit('Repas', { ...cleanSlot(slotOf(key)), [field]: nom });
+    closeSheet();
+  },
   'choose-random': () => {
     const { key, field } = ui.picker;
     const slot = cleanSlot(slotOf(key));
@@ -778,9 +789,8 @@ const actions = {
     if (def) commit('Catalogue', catalogRow(def));
   },
   'toggle-shop': (el) => {
-    const item = itemById(el.dataset.id);
     commit('Courses', {
-      key: shopKey(ui.week, el.dataset.id), semaine: ui.week, article: item?.name ?? el.dataset.id,
+      key: shopKey(ui.week, el.dataset.id), semaine: ui.week, article: el.dataset.name || el.dataset.id,
       coche: el.checked, extra: false, supprime: false,
     });
   },
@@ -948,9 +958,11 @@ document.addEventListener('input', (event) => {
   const q = slugify(event.target.value);
   const options = [...$sheet.querySelectorAll('.options .option')];
   for (const opt of options) opt.hidden = Boolean(q) && !opt.dataset.search.includes(q);
-  const create = $sheet.querySelector('[data-action="create-choose"]');
+  const create = $sheet.querySelector('[data-create]');
+  const name = event.target.value.trim();
   create.hidden = !q || options.some((opt) => opt.dataset.search === q);
-  create.querySelector('span').textContent = `➕ Ajouter « ${event.target.value.trim()} »`;
+  create.querySelector('[data-action="create-choose"] span').textContent = `➕ Ajouter « ${name} » au catalogue`;
+  create.querySelector('[data-action="free-choose"] span').textContent = `✏️ « ${name} » juste pour ce repas`;
   for (const group of $sheet.querySelectorAll('.options')) {
     const visible = [...group.children].some((c) => !c.hidden);
     group.hidden = !visible;
@@ -962,10 +974,8 @@ document.addEventListener('input', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' || !event.target.matches('[data-input="filter"]')) return;
   event.preventDefault();
-  const create = $sheet.querySelector('[data-action="create-choose"]');
   const visible = [...$sheet.querySelectorAll('.options .option')].filter((opt) => !opt.hidden && !opt.closest('[hidden]'));
-  if (!create.hidden) create.click();
-  else if (visible.length === 1) visible[0].click();
+  if (visible.length === 1) visible[0].click();
 });
 
 document.addEventListener('submit', (event) => {
