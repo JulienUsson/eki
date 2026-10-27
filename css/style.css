@@ -167,6 +167,7 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; outline: none; }
   font-weight: 500;
 }
 
+a.btn { display: inline-block; text-decoration: none; color: inherit; }
 .btn.small { padding: 5px 12px; font-size: .9rem; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }

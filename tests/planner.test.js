@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildCatalog, byType, cuissonCandidates, emptySlot, fillWeek, inSeason, isPlanned, shoppingItems, shoppingText,
-  slotContent, slotKey, slugify, weekUsage,
+  bringDeeplink, pendingLines, slotContent, slotKey, slugify, weekUsage,
 } from '../js/planner.js';
 
 const seeded = (seed = 1) => () => {
@@ -150,4 +150,23 @@ test('one-off ingredients typed in a meal are kept and shopped', () => {
   assert.equal(patisson.name, 'Pâtisson');
   assert.equal(patisson.type, 'legume');
   assert.ok(items.some((i) => i.id === 't:proteine:seitan' && i.type === 'proteine'));
+});
+
+test('Bring! export sends unchecked items through the script page', () => {
+  const items = [
+    { id: 'poireau', name: 'Poireau', count: 2 },
+    { id: 'oeufs', name: 'Œufs', count: 1 },
+    { id: 'riz', name: 'Riz', count: 3 },
+  ];
+  const extras = [{ article: 'Lait', coche: false }, { article: 'Pain', coche: true }];
+  const lines = pendingLines(items, extras, new Set(['riz']));
+  assert.deepEqual(lines, ['Poireau (2 repas)', 'Œufs', 'Lait']);
+  const { page, deeplink } = bringDeeplink('https://script.google.com/macros/s/abc/exec', 'Courses · semaine 44', lines);
+  const pageUrl = new URL(page);
+  assert.equal(pageUrl.searchParams.get('bring'), '1');
+  assert.deepEqual(pageUrl.searchParams.getAll('i'), lines);
+  const link = new URL(deeplink);
+  assert.equal(link.origin + link.pathname, 'https://api.getbring.com/rest/bringrecipes/deeplink');
+  assert.equal(link.searchParams.get('url'), page);
+  assert.equal(link.searchParams.get('source'), 'web');
 });

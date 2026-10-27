@@ -11,6 +11,7 @@ function setup() {
 }
 
 function doGet(e) {
+  if (e && e.parameter && e.parameter.bring) return bringPage_(e.parameters);
   return respond_(function () {
     checkToken_(e && e.parameter && e.parameter.token);
     return readAll_();
@@ -50,6 +51,30 @@ function spreadsheet_() {
   }
   spreadsheetCache_ = ss;
   return ss;
+}
+
+function bringPage_(params) {
+  const escape = function (text) {
+    return String(text).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  };
+  const title = String((params.titre || ['Courses'])[0]).slice(0, 200);
+  const items = (params.i || []).map(String).filter(Boolean).slice(0, 300);
+  const recipe = {
+    '@context': 'https://schema.org',
+    '@type': 'Recipe',
+    name: title,
+    author: { '@type': 'Person', name: 'Eki' },
+    recipeYield: '1',
+    recipeIngredient: items,
+  };
+  const html = '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + escape(title) + '</title>'
+    + '<script type="application/ld+json">' + JSON.stringify(recipe).replace(/</g, '\\u003c') + '</script></head>'
+    + '<body><h1>' + escape(title) + '</h1><ul>'
+    + items.map(function (item) { return '<li>' + escape(item) + '</li>'; }).join('')
+    + '</ul></body></html>';
+  return ContentService.createTextOutput(html).setMimeType(ContentService.MimeType.TEXT);
 }
 
 function respond_(fn) {

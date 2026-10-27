@@ -173,6 +173,21 @@ export function shopKey(week, id) {
   return `${week}|${id}`;
 }
 
+export function pendingLines(items, extras, checked) {
+  return [
+    ...items.filter((item) => !checked.has(item.id)).map((item) => `${item.name}${item.count > 1 ? ` (${item.count} repas)` : ''}`),
+    ...extras.filter((row) => !row.coche).map((row) => row.article),
+  ];
+}
+
+export function bringDeeplink(scriptUrl, title, lines) {
+  const params = new URLSearchParams({ bring: '1', titre: title });
+  for (const line of lines) params.append('i', line);
+  const page = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}${params}`;
+  const query = new URLSearchParams({ url: page, source: 'web', baseQuantity: '1', requestedQuantity: '1' });
+  return { page, deeplink: `https://api.getbring.com/rest/bringrecipes/deeplink?${query}` };
+}
+
 export function shoppingText(title, items, extras, checked) {
   const lines = [title];
   for (const type of SHOPPING_GROUPS) {

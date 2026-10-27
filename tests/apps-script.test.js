@@ -79,6 +79,7 @@ function loadScript({ bound = true } = {}) {
       vm.runInContext(source, ctx);
     },
     get: (token) => call('doGet', { parameter: { token } }),
+    raw: (fn, arg) => ctx[fn](arg).text,
     post: (body) => call('doPost', { postData: { contents: JSON.stringify(body) } }),
   };
 }
@@ -126,4 +127,18 @@ test('standalone script creates its spreadsheet once and reuses it', () => {
   script.reload();
   assert.equal(script.get('change-moi').data.Courses[0].article, 'Lait');
   assert.deepEqual(script.created, ['Eki · repas']);
+});
+
+test('serves a schema.org recipe page for Bring! without the token', () => {
+  const script = loadScript();
+  const html = script.raw('doGet', {
+    parameter: { bring: '1' },
+    parameters: { bring: ['1'], titre: ['Courses · semaine 44'], i: ['Poireau (2 repas)', '</script><b>'] },
+  });
+  const json = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)[1]);
+  assert.equal(json['@type'], 'Recipe');
+  assert.equal(json.name, 'Courses · semaine 44');
+  assert.deepEqual(json.recipeIngredient, ['Poireau (2 repas)', '</script><b>']);
+  assert.ok(!html.includes('<b>'));
+  assert.ok(!html.includes('Repas'));
 });

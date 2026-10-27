@@ -10,7 +10,7 @@ PWA (installable sur téléphone, fonctionne hors ligne) pour planifier les repa
   - ⋯ → **👯 Cuisiner double** : choisis le créneau où vous mangerez la même chose ; il affiche « 🔁 Restes de lundi soir » et suit automatiquement les changements du repas d'origine. Le même lien se fait depuis le créneau des restes avec **🔁 Manger les restes d'un autre repas**.
   - ⋯ → **Repas libre** (resto, invités…) pour qu'un créneau soit ignoré.
 - **🥕 Saison** : légumes de saison mois par mois avec leurs cuissons adaptées, et le catalogue des cuissons, protéines et féculents. Tout est modifiable (ajout, édition, suppression).
-- **🛒 Courses** : liste de courses générée depuis la semaine (avec le nombre de repas par ingrédient, restes compris), à cocher au magasin, avec des articles divers en plus. Partage / copie en texte.
+- **🛒 Courses** : liste de courses générée depuis la semaine (avec le nombre de repas par ingrédient, restes compris), à cocher au magasin, avec des articles divers en plus. Partage / copie en texte, ou envoi vers **Bring!** (voir plus bas).
 - **⚙️ Réglages** : partage via Google Sheets, repas à planifier (midi / soir), export / import JSON.
 
 Aucune dépendance, aucun build : HTML + CSS + modules JavaScript.
@@ -50,6 +50,12 @@ Fonctionnement de la synchro :
 - en cas de modification simultanée d'une même case, la plus récente l'emporte (colonne `updatedAt`).
 
 Le jeton protège l'accès au script : toute personne qui a l'URL **et** le jeton peut lire et modifier le planning. Si tu modifies le script, utilise **Déployer → Gérer les déploiements → Modifier → Nouvelle version** pour garder la même URL.
+
+## Envoyer la liste vers Bring!
+
+Le bouton **🛒 Bring!** de l'onglet Courses envoie les articles non cochés vers l'app [Bring!](https://www.getbring.com) via son import de recettes officiel : Bring! s'ouvre et propose d'ajouter les ingrédients à ta liste (il reconnaît la plupart des articles et garde « 2 repas » comme précision).
+
+Bring! doit pouvoir lire la liste sur Internet : c'est ton script Google qui la sert (`?bring=1&i=…`, sans le jeton, en ne renvoyant que les articles passés dans l'adresse). Il faut donc être connecté à Google Sheets et avoir la dernière version du script : après l'avoir remplacé, **Déployer → Gérer les déploiements → ✏️ Modifier → Version : Nouvelle version → Déployer** (l'URL ne change pas). L'app prévient si le script n'est pas à jour.
 
 ## Lancer en local
 

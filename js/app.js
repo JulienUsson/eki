@@ -2,7 +2,7 @@ import { AUTRE, DAYS, DEFAULT_CATALOG, MEALS, MONTHS, SHOPPING_GROUPS, SHORT_MON
 import { dayLabel, shiftWeek, weekDates, weekId, weekLabel, weekMonth, weekNumber } from './dates.js';
 import {
   buildCatalog, byType, cuissonCandidates, emptySlot, fillSlot, fillWeek, inSeason, isPlanned, parseItems,
-  seasonalLegumes, shopKey, shoppingItems, shoppingText, slotContent, slugify, weekSlots, weekUsage,
+  bringDeeplink, pendingLines, seasonalLegumes, shopKey, shoppingItems, shoppingText, slotContent, slugify, weekSlots, weekUsage,
 } from './planner.js';
 import { buildInvite, hasInvite, parseInvite } from './invite.js';
 import { TABLE_NAMES } from './schema.js';
@@ -278,6 +278,7 @@ function renderShopping() {
     <div class="toolbar">
       <button type="button" class="btn primary" data-action="share-list">📤 Partager</button>
       <button type="button" class="btn" data-action="copy-list">📋 Copier</button>
+      <button type="button" class="btn" data-action="bring">🛒 Bring!</button>
       <button type="button" class="btn" data-action="uncheck-all">Tout décocher</button>
     </div>
     ${items.length ? groups : `
@@ -636,6 +637,51 @@ async function copyText(text) {
   }
 }
 
+function bringSheet() {
+  const head = `
+    <div class="sheet-head">
+      <h3>🛒 Envoyer à Bring!</h3>
+      <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
+    </div>`;
+  if (!store.syncEnabled) {
+    openSheet(`${head}
+      <p>Bring! importe la liste depuis ton script Google : connecte d’abord l’app à Google Sheets.</p>
+      <div class="toolbar"><button type="button" class="btn primary" data-tab="reglages">⚙️ Réglages</button></div>`);
+    return;
+  }
+  const items = shoppingItems(ui.week, store.table('Repas'), catalog(), mealIds());
+  const { checked, extras } = shoppingState(ui.week);
+  const lines = pendingLines(items, extras, checked);
+  if (!lines.length) {
+    toast('Rien à envoyer : tout est coché');
+    return;
+  }
+  const { page, deeplink } = bringDeeplink(store.settings.url, `Courses · semaine ${weekNumber(ui.week)}`, lines);
+  openSheet(`${head}
+    <p class="hint">${lines.length} article(s) non coché(s). Bring! s’ouvre et te laisse choisir ceux à ajouter à ta liste.</p>
+    <p class="status" data-bring-status>Vérification du script…</p>
+    <div class="toolbar">
+      <a class="btn primary" href="${esc(deeplink)}" target="_blank" rel="noopener" data-bring-open>Ouvrir dans Bring!</a>
+    </div>`);
+  fetch(page)
+    .then((response) => response.text())
+    .then((text) => {
+      const status = $sheet.querySelector('[data-bring-status]');
+      if (!status) return;
+      if (text.includes('application/ld+json')) {
+        status.textContent = '✅ Prêt';
+      } else {
+        status.classList.add('error');
+        $sheet.querySelector('[data-bring-open]').hidden = true;
+        status.innerHTML = '⚠️ Ton script Google n’est pas à jour : remplace-le par le nouveau script puis <b>Déployer → Gérer les déploiements → Modifier → Nouvelle version</b>. <button type="button" class="btn small" data-action="copy-script">📋 Copier le script</button>';
+      }
+    })
+    .catch(() => {
+      const status = $sheet.querySelector('[data-bring-status]');
+      if (status) status.textContent = '⚠️ Pas de connexion : Bring! a besoin d’Internet pour importer la liste.';
+    });
+}
+
 function listText() {
   const items = shoppingItems(ui.week, store.table('Repas'), catalog(), mealIds());
   const { checked, extras } = shoppingState(ui.week);
@@ -808,6 +854,7 @@ const actions = {
   },
   'share-list': () => shareText(listText(), 'Liste de courses'),
   'copy-list': () => copyText(listText()),
+  bring: () => bringSheet(),
   'sync-now': () => {
     if (!store.syncEnabled) return;
     sync.run().then(() => toast(sync.status === 'error' ? `Erreur : ${sync.error}` : 'Synchronisé ✅'));
