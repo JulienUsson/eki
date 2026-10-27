@@ -1,0 +1,11 @@
+{
+  "name": "eki",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PWA de planification des repas de la semaine avec synchronisation Google Sheets",
+  "scripts": {
+    "start": "npx --yes serve -l 8080 .",
+    "test": "node --test"
+  }
+}

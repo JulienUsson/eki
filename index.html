@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Eki · Repas de la semaine</title>
+  <meta name="description" content="Planifie les repas de la semaine avec les légumes de saison et génère la liste de courses.">
+  <meta name="theme-color" content="#3f7d4e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Eki">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="title">Eki</h1>
+    <button id="sync-badge" class="sync-badge" type="button" data-action="sync-now" hidden></button>
+  </header>
+  <main id="view" tabindex="-1"></main>
+  <nav class="tabs" aria-label="Navigation">
+    <button type="button" data-tab="semaine"><span aria-hidden="true">📅</span>Semaine</button>
+    <button type="button" data-tab="saison"><span aria-hidden="true">🥕</span>Saison</button>
+    <button type="button" data-tab="courses"><span aria-hidden="true">🛒</span>Courses</button>
+    <button type="button" data-tab="reglages"><span aria-hidden="true">⚙️</span>Réglages</button>
+  </nav>
+  <dialog id="sheet" class="sheet"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
