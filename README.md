@@ -15,16 +15,21 @@ Aucune dépendance, aucun build : HTML + CSS + modules JavaScript.
 
 Les données sont enregistrées dans une feuille Google Sheets via un petit script Apps Script. Pas de projet Google Cloud ni d'OAuth à configurer.
 
-1. Crée une feuille Google Sheets vide.
-2. **Extensions → Apps Script**, remplace le contenu de `Code.gs` par [`apps-script/Code.gs`](apps-script/Code.gs) (bouton « Copier le script » dans les réglages de l'app).
+1. Ouvre [script.google.com](https://script.google.com/home/projects/create) et crée un **nouveau projet** (sur Android, dans Chrome, active **⋮ → Version pour ordinateur** : l'appli Google Sheets ne permet pas d'éditer de script).
+2. Remplace tout le contenu de `Code.gs` par [`apps-script/Code.gs`](apps-script/Code.gs) (bouton « Copier le script » dans les réglages de l'app).
 3. Remplace `change-moi` dans `const TOKEN = 'change-moi';` par un mot de passe à vous.
-4. **Déployer → Nouveau déploiement** → type **Application Web** :
+4. Clique sur **Exécuter** (fonction `setup`) et autorise l'accès demandé par Google : la feuille « Eki · repas » est créée dans ton Drive et son lien s'affiche dans le journal d'exécution.
+5. **Déployer → Nouveau déploiement** → type **Application Web** :
    - Exécuter en tant que : **moi**
    - Qui a accès : **Tout le monde**
 
-   Autorise l'accès demandé par Google, puis copie l'URL qui se termine par `/exec`.
-5. Dans l'app : **Réglages → Partage via Google Sheets**, colle l'URL et le jeton, puis **Connecter**. Les données déjà saisies sur le téléphone sont envoyées dans la feuille.
-6. **🔗 Inviter** génère un lien à envoyer à ta compagne : en l'ouvrant, son téléphone se connecte à la même feuille.
+   Copie l'URL qui se termine par `/exec`.
+6. Dans l'app : **Réglages → Partage via Google Sheets**, colle l'URL et le jeton, puis **Connecter**. Les données déjà saisies sur le téléphone sont envoyées dans la feuille.
+7. **🔗 Inviter** génère un lien à envoyer à ta compagne : en l'ouvrant, son téléphone se connecte à la même feuille.
+
+Pour utiliser une feuille existante, renseigne son identifiant (la partie entre `/d/` et `/edit` de son URL) dans `const SHEET_ID = '';`, ou ouvre le script depuis la feuille via **Extensions → Apps Script**.
+
+> « Impossible d'ouvrir le fichier pour le moment » en ouvrant Apps Script : plusieurs comptes Google sont connectés dans le navigateur et Apps Script s'ouvre avec le mauvais. Passe par script.google.com comme ci-dessus, ou utilise une fenêtre de navigation privée connectée à un seul compte.
 
 La feuille contient trois onglets créés automatiquement :
 

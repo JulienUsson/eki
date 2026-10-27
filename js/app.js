@@ -296,15 +296,16 @@ function renderSettings() {
       <details class="more">
         <summary>Comment créer la feuille partagée ?</summary>
         <ol class="steps">
-          <li>Crée une feuille Google Sheets vide (et partage-la avec ta compagne si vous voulez la consulter).</li>
-          <li>Menu <b>Extensions → Apps Script</b>, remplace le contenu par le script :
+          <li>Ouvre <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> (sur Android : Chrome en <b>version pour ordinateur</b>) et crée un <b>nouveau projet</b>.</li>
+          <li>Remplace tout le contenu par le script :
             <button type="button" class="btn small" data-action="copy-script">📋 Copier le script</button></li>
           <li>Change la valeur de <code>TOKEN</code> en haut du script par un mot de passe à vous.</li>
-          <li><b>Déployer → Nouveau déploiement</b>, type <b>Application Web</b>, « Exécuter en tant que : <b>moi</b> », « Accès : <b>Tout le monde</b> ». Autorise l’accès.</li>
+          <li>Clique sur <b>Exécuter</b> (fonction <code>setup</code>) et autorise l’accès : la feuille « Eki · repas » est créée dans ton Drive.</li>
+          <li><b>Déployer → Nouveau déploiement</b>, type <b>Application Web</b>, « Exécuter en tant que : <b>moi</b> », « Accès : <b>Tout le monde</b> ».</li>
           <li>Colle ici l’URL qui se termine par <code>/exec</code> et le jeton, puis <b>Connecter</b>.</li>
           <li>Sur le téléphone de ta compagne : ouvre le lien du bouton <b>🔗 Inviter</b>.</li>
         </ol>
-        <p class="hint">Les onglets <b>Repas</b>, <b>Catalogue</b> et <b>Courses</b> sont créés automatiquement dans la feuille.</p>
+        <p class="hint">Les onglets <b>Repas</b>, <b>Catalogue</b> et <b>Courses</b> sont créés automatiquement. « Impossible d’ouvrir le fichier » : plusieurs comptes Google sont connectés, utilise une fenêtre de navigation privée avec un seul compte.</p>
       </details>
     </section>
     <section class="block card">

@@ -28,27 +28,56 @@ function fakeSheet() {
   };
 }
 
-function loadScript() {
+function loadScript({ bound = true } = {}) {
   const sheets = {};
+  const props = {};
+  const created = [];
+  const spreadsheet = {
+    getSheetByName: (name) => sheets[name] ?? null,
+    insertSheet: (name) => (sheets[name] = fakeSheet()),
+    getSheets: () => Object.values(sheets),
+    getId: () => 'sheet-123',
+    getUrl: () => 'https://docs.google.com/spreadsheets/d/sheet-123',
+  };
   const context = {
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => ({
-        getSheetByName: (name) => sheets[name] ?? null,
-        insertSheet: (name) => (sheets[name] = fakeSheet()),
-      }),
+      getActiveSpreadsheet: () => (bound ? spreadsheet : null),
+      openById: (id) => (id === 'sheet-123' && created.length ? spreadsheet : null),
+      create: (name) => {
+        created.push(name);
+        const first = fakeSheet();
+        first.setName = (n) => { sheets[n] = first; };
+        return { ...spreadsheet, getSheets: () => [first] };
+      },
       flush() {},
     },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => props[k] ?? null,
+        setProperty: (k, v) => { props[k] = v; },
+      }),
+    },
+    Logger: { log() {} },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: {
       MimeType: { JSON: 'json' },
       createTextOutput: (text) => ({ text, setMimeType() { return this; } }),
     },
   };
-  vm.createContext(context);
-  vm.runInContext(readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), context);
-  const call = (fn, arg) => JSON.parse(context[fn](arg).text);
+  const source = readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8');
+  let ctx = { ...context };
+  vm.createContext(ctx);
+  vm.runInContext(source, ctx);
+  const call = (fn, arg) => JSON.parse(ctx[fn](arg).text);
   return {
     sheets,
+    props,
+    created,
+    reload() {
+      ctx = { ...context };
+      vm.createContext(ctx);
+      vm.runInContext(source, ctx);
+    },
     get: (token) => call('doGet', { parameter: { token } }),
     post: (body) => call('doPost', { postData: { contents: JSON.stringify(body) } }),
   };
@@ -86,4 +115,15 @@ test('keeps columns added by hand and adds new ones', () => {
   assert.deepEqual(script.sheets.Courses.grid[0], ['key', 'article', 'updatedAt', 'note', 'coche']);
   assert.equal(res.data.Courses[0].note, 'demi-écrémé');
   assert.equal(res.data.Courses[1].coche, 'x');
+});
+
+test('standalone script creates its spreadsheet once and reuses it', () => {
+  const script = loadScript({ bound: false });
+  const row = { key: 'a', article: 'Lait', updatedAt: '1' };
+  assert.equal(script.post({ token: 'change-moi', changes: { Courses: [row] } }).data.Courses[0].article, 'Lait');
+  assert.deepEqual(script.created, ['Eki · repas']);
+  assert.equal(script.props.SHEET_ID, 'sheet-123');
+  script.reload();
+  assert.equal(script.get('change-moi').data.Courses[0].article, 'Lait');
+  assert.deepEqual(script.created, ['Eki · repas']);
 });

@@ -1,6 +1,14 @@
 const TOKEN = 'change-moi';
 
+const SHEET_ID = '';
+
 const TABLES = ['Repas', 'Catalogue', 'Courses'];
+
+function setup() {
+  const ss = spreadsheet_();
+  TABLES.forEach(sheet_);
+  Logger.log('Feuille : ' + ss.getUrl());
+}
 
 function doGet(e) {
   return respond_(function () {
@@ -28,6 +36,22 @@ function doPost(e) {
   });
 }
 
+let spreadsheetCache_ = null;
+
+function spreadsheet_() {
+  if (spreadsheetCache_) return spreadsheetCache_;
+  const props = PropertiesService.getScriptProperties();
+  const id = SHEET_ID || props.getProperty('SHEET_ID');
+  let ss = SpreadsheetApp.getActiveSpreadsheet() || (id && SpreadsheetApp.openById(id));
+  if (!ss) {
+    ss = SpreadsheetApp.create('Eki · repas');
+    ss.getSheets()[0].setName(TABLES[0]);
+    props.setProperty('SHEET_ID', ss.getId());
+  }
+  spreadsheetCache_ = ss;
+  return ss;
+}
+
 function respond_(fn) {
   let payload;
   try {
@@ -43,7 +67,7 @@ function checkToken_(token) {
 }
 
 function sheet_(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = spreadsheet_();
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
