@@ -32,9 +32,9 @@ function fakeServer() {
 }
 
 test('sheet row round trip', () => {
-  const row = { key: 'patisson', type: 'legume', nom: 'Pâtisson', emoji: '🎃', mois: [9, 10], cuissons: ['four', 'gratin'], supprime: false, updatedAt: 12 };
+  const row = { key: 'patisson', type: 'legume', nom: 'Pâtisson', emoji: '🎃', mois: [9, 10], cuissons: ['four', 'gratin'], famille: '', supprime: false, updatedAt: 12 };
   const sheet = toSheetRow('Catalogue', row);
-  assert.deepEqual(sheet, { key: 'patisson', type: 'legume', nom: 'Pâtisson', emoji: '🎃', mois: '9, 10', cuissons: 'four, gratin', supprime: '', updatedAt: '12' });
+  assert.deepEqual(sheet, { key: 'patisson', type: 'legume', nom: 'Pâtisson', emoji: '🎃', mois: '9, 10', cuissons: 'four, gratin', famille: '', supprime: '', updatedAt: '12' });
   assert.deepEqual(fromSheetRow('Catalogue', sheet), row);
 });
 

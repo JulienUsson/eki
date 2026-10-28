@@ -7,7 +7,7 @@ export const TABLES = {
     libre: 'bool', autres: 'items', reprise: 'text',
   },
   Catalogue: {
-    type: 'text', nom: 'text', emoji: 'text', mois: 'numbers', cuissons: 'list', supprime: 'bool',
+    type: 'text', nom: 'text', emoji: 'text', mois: 'numbers', cuissons: 'list', famille: 'text', supprime: 'bool',
   },
   Courses: {
     semaine: 'text', article: 'text', coche: 'bool', extra: 'bool', supprime: 'bool',

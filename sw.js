@@ -1,4 +1,4 @@
-const CACHE = 'eki-v7';
+const CACHE = 'eki-v9';
 
 const ASSETS = [
   './',
@@ -6,6 +6,7 @@ const ASSETS = [
   'manifest.webmanifest',
   'css/style.css',
   'js/app.js',
+  'js/balance.js',
   'js/data.js',
   'js/dates.js',
   'js/invite.js',

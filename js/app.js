@@ -1,9 +1,10 @@
-import { AUTRE, DAYS, DEFAULT_CATALOG, MEALS, MONTHS, SHOPPING_GROUPS, SHORT_MONTHS, SLOT_FIELDS, TYPES, groupInfo } from './data.js';
+import { AUTRE, DAYS, DEFAULT_CATALOG, FAMILLES, MEALS, MONTHS, SHOPPING_GROUPS, SHORT_MONTHS, SLOT_FIELDS, TYPES, groupInfo } from './data.js';
 import { dayLabel, shiftWeek, weekDates, weekId, weekLabel, weekMonth, weekNumber } from './dates.js';
 import {
   buildCatalog, byType, cuissonCandidates, emptySlot, fillSlot, fillWeek, inSeason, isPlanned, parseItems,
-  bringDeeplink, pendingLines, seasonalLegumes, shopKey, shoppingItems, shoppingText, slotContent, slugify, weekSlots, weekUsage,
+  bringDeeplink, guessFamily, pendingLines, seasonalLegumes, shopKey, shoppingItems, shoppingText, slotContent, slugify, weekSlots, weekUsage,
 } from './planner.js';
+import { MIN_PLANNED, weekBalance } from './balance.js';
 import { buildInvite, hasInvite, parseInvite } from './invite.js';
 import { TABLE_NAMES } from './schema.js';
 import { Store } from './store.js';
@@ -18,6 +19,7 @@ const ui = {
   month: new Date().getMonth() + 1,
   picker: null,
   reprise: null,
+  balanceOpen: null,
 };
 
 const $view = document.getElementById('view');
@@ -183,7 +185,27 @@ function renderWeek() {
       <button type="button" class="btn" data-action="clear-week">Vider</button>
     </div>
     <p class="hint">Les propositions utilisent les légumes de saison de ${MONTHS[weekMonth(ui.week) - 1]} et évitent les répétitions.</p>
+    ${renderBalance(meals, ids)}
     <div class="days">${days}</div>`;
+}
+
+function renderBalance(meals, ids) {
+  const { planned, alerts } = weekBalance(ui.week, meals, catalog(), ids);
+  const icons = { warn: '⚠️', info: '💡', ok: '✅' };
+  const badges = ['warn', 'info', 'ok']
+    .map((level) => [level, alerts.filter((a) => a.level === level).length])
+    .filter(([, n]) => n)
+    .map(([level, n]) => `<span class="badge ${level}">${icons[level]} ${n}</span>`)
+    .join('');
+  const body = planned < MIN_PLANNED
+    ? `<p class="hint">Planifie au moins ${MIN_PLANNED} repas pour voir le bilan de la semaine.</p>`
+    : `<ul class="alerts">${alerts.map((a) => `<li class="${a.level}">${esc(a.text)}</li>`).join('')}</ul>
+      <p class="hint">Repères du Programme national nutrition santé (mangerbouger.fr). Les repas libres ne sont pas comptés.</p>`;
+  return `
+    <details class="balance" data-balance ${ui.balanceOpen ?? alerts.some((a) => a.level !== 'ok') ? 'open' : ''}>
+      <summary><span>⚖️ Équilibre de la semaine</span><span class="badges">${badges}</span></summary>
+      ${body}
+    </details>`;
 }
 
 function seasonBar(item) {
@@ -573,6 +595,12 @@ function editItem(item, type) {
         <label class="emoji-field">Emoji<input name="emoji" value="${esc(item?.emoji ?? TYPES[t].emoji)}" maxlength="4"></label>
         <label class="grow">Nom<input name="nom" value="${esc(item?.name ?? '')}" required autocomplete="off"></label>
       </div>
+      ${FAMILLES[t] ? `
+        <label>Famille
+          <select name="famille">${FAMILLES[t].map(([value, label]) => `
+            <option value="${value}" ${(item?.famille ?? '') === value ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </label>` : ''}
       ${t === 'legume' ? `
         <fieldset>
           <legend>Mois de saison</legend>
@@ -608,6 +636,7 @@ function catalogRow(item, patch = {}) {
     emoji: item.emoji ?? '',
     mois: item.months ?? [],
     cuissons: item.cuissons ?? [],
+    famille: item.famille ?? '',
     supprime: false,
     ...patch,
   };
@@ -743,7 +772,7 @@ const actions = {
     const nom = $sheet.querySelector('[data-input="filter"]').value.trim();
     if (!nom) return;
     const id = newItemId(nom);
-    commit('Catalogue', { key: id, type: field, nom, emoji: TYPES[field].emoji, mois: [], cuissons: [], supprime: false });
+    commit('Catalogue', { key: id, type: field, nom, emoji: TYPES[field].emoji, mois: [], cuissons: [], famille: guessFamily(nom, field), supprime: false });
     commit('Repas', { ...cleanSlot(slotOf(key)), [field]: id });
     closeSheet();
     toast(`« ${nom} » ajouté au catalogue`);
@@ -948,6 +977,7 @@ const forms = {
       emoji: String(data.get('emoji') ?? '').trim(),
       mois: data.getAll('mois').map(Number),
       cuissons: data.getAll('cuissons').map(String),
+      famille: String(data.get('famille') ?? ''),
       supprime: false,
     });
     closeSheet();
@@ -1034,6 +1064,10 @@ document.addEventListener('submit', (event) => {
 });
 
 $sheet.addEventListener('close', () => { ui.picker = null; });
+
+document.addEventListener('toggle', (event) => {
+  if (event.target.matches?.('[data-balance]')) ui.balanceOpen = event.target.open;
+}, true);
 
 $view.addEventListener('focusout', () => {
   setTimeout(() => {

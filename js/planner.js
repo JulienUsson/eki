@@ -16,6 +16,37 @@ export function parseItems(value) {
   return list.map((item) => String(item).trim()).filter(Boolean);
 }
 
+const KEYWORDS = {
+  proteine: [
+    ['poisson-gras', ['saumon', 'sardine', 'maquereau', 'hareng', 'truite', 'anchois']],
+    ['poisson', ['poisson', 'cabillaud', 'colin', 'merlu', 'lieu', 'dorade', 'daurade', 'bar', 'sole', 'thon', 'crevette', 'moule', 'calamar', 'seiche', 'saint-jacques', 'gambas', 'surimi', 'merlan', 'lotte']],
+    ['charcuterie', ['jambon', 'saucisse', 'lardon', 'bacon', 'chorizo', 'saucisson', 'merguez', 'chipolata', 'knack', 'rillette', 'pate', 'boudin', 'andouille']],
+    ['volaille', ['poulet', 'dinde', 'canard', 'pintade', 'volaille', 'caille', 'lapin']],
+    ['viande', ['boeuf', 'porc', 'veau', 'agneau', 'mouton', 'steak', 'bavette', 'entrecote', 'roti', 'cote', 'hache', 'filet-mignon', 'abats', 'foie']],
+    ['legumineuse', ['lentille', 'pois-chiche', 'haricot', 'flageolet', 'feve', 'pois-casse', 'soja', 'edamame', 'houmous']],
+    ['vegetal', ['tofu', 'tempeh', 'seitan']],
+    ['oeuf', ['oeuf', 'omelette']],
+  ],
+  feculent: [
+    ['legumineuse', ['lentille', 'pois-chiche', 'haricot', 'flageolet', 'pois-casse']],
+    ['complet', ['complet', 'quinoa', 'sarrasin', 'boulgour', 'epeautre', 'avoine', 'seigle', 'millet']],
+  ],
+};
+
+export function guessFamily(name, type) {
+  const slug = slugify(name);
+  for (const [family, words] of KEYWORDS[type] ?? []) {
+    if (words.some((word) => slug.includes(word))) return family;
+  }
+  return '';
+}
+
+export function familyOf(value, field, index) {
+  if (!value) return '';
+  const item = index.get(value);
+  return item ? item.famille || guessFamily(item.name, field) : guessFamily(value, field);
+}
+
 export function buildCatalog(overrides = {}) {
   const items = new Map(DEFAULT_CATALOG.map((item) => [item.id, { ...item, custom: false }]));
   for (const row of Object.values(overrides)) {
@@ -31,6 +62,7 @@ export function buildCatalog(overrides = {}) {
       emoji: row.emoji || base?.emoji || '',
       months: row.mois?.length ? row.mois : base?.months ?? [],
       cuissons: row.cuissons?.length ? row.cuissons : base?.cuissons ?? [],
+      famille: row.famille || base?.famille || '',
       custom: !DEFAULT_CATALOG.some((d) => d.id === row.key),
     });
   }
@@ -113,7 +145,38 @@ export function seasonalLegumes(catalog, month) {
   return (seasonal.length ? seasonal : legumes).map((item) => item.id);
 }
 
-export function fillSlot(slot, catalog, month, counts, previous, rng = Math.random) {
+function proteinFamily(id, index) {
+  return familyOf(id, 'proteine', index) || 'autre';
+}
+
+export function proteinCandidates(catalog, counts, remaining = 1) {
+  const index = new Map(catalog.map((item) => [item.id, item]));
+  const items = byType(catalog, 'proteine');
+  const done = {};
+  for (const [id, n] of Object.entries(counts.proteine ?? {})) {
+    const family = proteinFamily(id, index);
+    done[family] = (done[family] ?? 0) + n;
+  }
+  const fish = (done.poisson ?? 0) + (done['poisson-gras'] ?? 0);
+  const blocked = new Set();
+  if (fish >= 2) blocked.add('poisson').add('poisson-gras');
+  if ((done.viande ?? 0) >= 3) blocked.add('viande');
+  if ((done.charcuterie ?? 0) >= 1) blocked.add('charcuterie');
+  if ((done.legumineuse ?? 0) >= 3) blocked.add('legumineuse');
+  const missingFat = Math.max(0, 1 - (done['poisson-gras'] ?? 0));
+  const missingFish = Math.max(0, 2 - fish, missingFat);
+  const missingPulses = Math.max(0, 2 - (done.legumineuse ?? 0));
+  const needed = new Set();
+  if (missingFat) needed.add('poisson-gras');
+  else if (missingFish) needed.add('poisson').add('poisson-gras');
+  if (missingPulses) needed.add('legumineuse');
+  const family = (item) => proteinFamily(item.id, index);
+  const forced = remaining <= missingFish + missingPulses ? items.filter((item) => needed.has(family(item))) : [];
+  const allowed = items.filter((item) => !blocked.has(family(item)));
+  return (forced.length ? forced : allowed.length ? allowed : items).map((item) => item.id);
+}
+
+export function fillSlot(slot, catalog, month, counts, previous, rng = Math.random, { remaining = 1, wantComplet = false } = {}) {
   const next = { ...slot };
   const ids = (type) => byType(catalog, type).map((item) => item.id);
   const take = (field, candidates) => {
@@ -121,10 +184,13 @@ export function fillSlot(slot, catalog, month, counts, previous, rng = Math.rand
     next[field] = pickLeastUsed(candidates, counts[field], previous?.[field], rng);
     if (next[field]) counts[field][next[field]] = (counts[field][next[field]] ?? 0) + 1;
   };
+  const complets = byType(catalog, 'feculent').filter((item) => item.famille === 'complet').map((item) => item.id);
   take('legume', seasonalLegumes(catalog, month));
-  take('cuisson', cuissonCandidates(catalog, next.legume));
-  take('proteine', ids('proteine'));
-  take('feculent', ids('feculent'));
+  const cuissons = cuissonCandidates(catalog, next.legume);
+  const light = cuissons.filter((id) => id !== 'gratin' || (counts.cuisson.gratin ?? 0) < 2);
+  take('cuisson', light.length ? light : cuissons);
+  take('proteine', proteinCandidates(catalog, counts, remaining));
+  take('feculent', wantComplet && complets.length ? complets : ids('feculent'));
   return next;
 }
 
@@ -132,14 +198,22 @@ export function fillWeek(week, meals, catalog, mealIds, rng = Math.random) {
   const slots = weekSlots(week, meals, mealIds);
   const month = weekMonth(week);
   const counts = weekUsage(slots, meals);
+  const index = new Map(catalog.map((item) => [item.id, item]));
+  const isComplet = (id) => familyOf(id, 'feculent', index) === 'complet';
+  const dayComplet = new Set(slots.map((slot) => slotContent(slot, meals)).filter((c) => c && isComplet(c.feculent)).map((c) => c.jour));
+  const fillable = slots.filter((slot) => !slot.libre && !slot.reprise);
+  let remaining = fillable.filter((slot) => !slot.proteine).length;
   const changed = [];
   let previous = null;
-  for (const slot of slots) {
-    if (slot.libre || slot.reprise) continue;
-    const filled = fillSlot(slot, catalog, month, counts, previous, rng);
+  fillable.forEach((slot, i) => {
+    const lastOfDay = !fillable.slice(i + 1).some((other) => other.jour === slot.jour && !other.feculent);
+    const wantComplet = !slot.feculent && !dayComplet.has(slot.jour) && (lastOfDay || rng() < 0.5);
+    const filled = fillSlot(slot, catalog, month, counts, previous, rng, { remaining: Math.max(remaining, 1), wantComplet });
+    if (!slot.proteine) remaining -= 1;
+    if (isComplet(filled.feculent)) dayComplet.add(slot.jour);
     if (SLOT_FIELDS.some((field) => filled[field] !== slot[field])) changed.push(filled);
     previous = filled;
-  }
+  });
   return changed;
 }
 
