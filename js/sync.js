@@ -1,4 +1,4 @@
-import { fromSheetData, toSheetRow, TABLE_NAMES } from './schema.js';
+import { fromSheetData, missingTables, toSheetRow, TABLE_NAMES } from './schema.js';
 
 export class Sync {
   constructor(store, fetchImpl = (...args) => globalThis.fetch(...args)) {
@@ -10,6 +10,7 @@ export class Sync {
     this.again = false;
     this.timer = null;
     this.listeners = new Set();
+    this.missing = [];
   }
 
   subscribe(fn) {
@@ -75,10 +76,12 @@ export class Sync {
           TABLE_NAMES.map((t) => [t, sent[t].map((row) => toSheetRow(t, row))]).filter(([, rows]) => rows.length),
         );
         const data = await this.request({ changes });
-        this.store.applyRemote(fromSheetData(data), sent);
+        this.missing = missingTables(data);
+        this.store.applyRemote(fromSheetData(data), sent, this.missing);
       } else {
         const data = await this.request();
-        this.store.applyRemote(fromSheetData(data));
+        this.missing = missingTables(data);
+        this.store.applyRemote(fromSheetData(data), null, this.missing);
       }
       this.setStatus('idle');
     } catch (err) {

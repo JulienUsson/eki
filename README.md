@@ -9,6 +9,7 @@ PWA (installable sur téléphone, fonctionne hors ligne) pour planifier les repa
   - 🎲 sur un repas le complète (ou le re-tire s'il est déjà plein).
   - ⋯ → **👯 Cuisiner double** : choisis le créneau où vous mangerez la même chose ; il affiche « 🔁 Restes de lundi soir » et suit automatiquement les changements du repas d'origine. Le même lien se fait depuis le créneau des restes avec **🔁 Manger les restes d'un autre repas**.
   - ⋯ → **Repas libre** (resto, invités…) pour qu'un créneau soit ignoré.
+  - ⋯ → **⭐ Enregistrer en favori** garde un repas (avec un nom, par exemple « Hachis parmentier ») ; le bouton **⭐** d'un repas ou ⋯ → **Choisir un repas favori** le remplit en un geste et affiche son nom. ⋯ → **✏️ Donner un nom** nomme un repas sans l'ajouter aux favoris. Les favoris se renomment ou se suppriment dans **Saison**.
   - **⚖️ Équilibre de la semaine** : alertes et conseils d'après les repères du PNNS ([mangerbouger.fr](https://www.mangerbouger.fr)) dès 4 repas planifiés — poisson 2 fois par semaine dont un gras, viande (bœuf, porc, veau, agneau) limitée à 500 g soit 3 à 4 repas, charcuterie limitée à 150 g, légumineuses au moins 2 fois, un féculent complet par jour, un légume à chaque repas, légumes hors saison, gratins fréquents et répétitions. Les restes comptent comme des repas mangés, les repas libres sont ignorés. « Compléter les trous » respecte ces repères (poisson, légumineuses, viande, charcuterie, féculents complets, gratins).
   - La **famille** d'une protéine (poisson gras, volaille, viande, charcuterie, légumineuses…) ou d'un féculent (complet, légumineuses) se règle dans **Saison** ; pour un ingrédient ajouté à la main, elle est devinée à partir du nom.
 - **🥕 Saison** : légumes de saison mois par mois avec leurs cuissons adaptées, et le catalogue des cuissons, protéines et féculents. Tout est modifiable (ajout, édition, suppression).
@@ -37,13 +38,14 @@ Pour utiliser une feuille existante, renseigne son identifiant (la partie entre 
 
 > « Impossible d'ouvrir le fichier pour le moment » en ouvrant Apps Script : plusieurs comptes Google sont connectés dans le navigateur et Apps Script s'ouvre avec le mauvais. Passe par script.google.com comme ci-dessus, ou utilise une fenêtre de navigation privée connectée à un seul compte.
 
-La feuille contient trois onglets créés automatiquement :
+La feuille contient quatre onglets créés automatiquement (les favoris nécessitent la dernière version du script ; avec une version plus ancienne ils restent sur l'appareil, et les réglages le signalent) :
 
 | Onglet | Contenu |
 | --- | --- |
-| `Repas` | une ligne par repas planifié (`semaine`, `jour`, `repas`, `legume`, `cuisson`, `proteine`, `feculent`, `libre`, `autres`, `reprise`) |
+| `Repas` | une ligne par repas planifié (`semaine`, `jour`, `repas`, `legume`, `cuisson`, `proteine`, `feculent`, `libre`, `autres`, `reprise`, `nom`) |
 | `Catalogue` | les ingrédients ajoutés, modifiés ou supprimés par rapport au catalogue par défaut |
 | `Courses` | articles cochés et articles divers de la liste de courses |
+| `Favoris` | repas favoris (`nom`, `legume`, `cuisson`, `proteine`, `feculent`, `autres`) |
 
 Fonctionnement de la synchro :
 

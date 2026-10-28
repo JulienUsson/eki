@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-function fakeSheet() {
+function fakeSheet(name = '') {
   let grid = [];
   const range = (r, c, rows, cols) => ({
     setNumberFormat() { return this; },
@@ -25,6 +25,8 @@ function fakeSheet() {
     },
     getRange(a, b, c, d) { return typeof a === 'string' ? range(1, 1, 0, 0) : range(a, b, c, d); },
     setFrozenRows() {},
+    getName: () => name,
+    setName(n) { name = n; },
   };
 }
 
@@ -34,7 +36,7 @@ function loadScript({ bound = true } = {}) {
   const created = [];
   const spreadsheet = {
     getSheetByName: (name) => sheets[name] ?? null,
-    insertSheet: (name) => (sheets[name] = fakeSheet()),
+    insertSheet: (name) => (sheets[name] = fakeSheet(name)),
     getSheets: () => Object.values(sheets),
     getId: () => 'sheet-123',
     getUrl: () => 'https://docs.google.com/spreadsheets/d/sheet-123',
@@ -46,7 +48,8 @@ function loadScript({ bound = true } = {}) {
       create: (name) => {
         created.push(name);
         const first = fakeSheet();
-        first.setName = (n) => { sheets[n] = first; };
+        const setName = first.setName;
+        first.setName = (n) => { setName(n); sheets[n] = first; };
         return { ...spreadsheet, getSheets: () => [first] };
       },
       flush() {},
@@ -141,4 +144,11 @@ test('serves a schema.org recipe page for Bring! without the token', () => {
   assert.deepEqual(json.recipeIngredient, ['Poireau (2 repas)', '</script><b>']);
   assert.ok(!html.includes('<b>'));
   assert.ok(!html.includes('Repas'));
+});
+
+test('returns every table, including Favoris and new ones created by the app', () => {
+  const script = loadScript();
+  const res = script.post({ token: 'change-moi', changes: { Favoris: [{ key: 'fav-1', nom: 'Hachis', updatedAt: '1' }], Nouveau: [{ key: 'n', updatedAt: '1' }], 'bad name': [{ key: 'x' }] } });
+  assert.deepEqual(Object.keys(res.data).sort(), ['Catalogue', 'Courses', 'Favoris', 'Nouveau', 'Repas']);
+  assert.equal(res.data.Favoris[0].nom, 'Hachis');
 });

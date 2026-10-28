@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildCatalog, byType, cuissonCandidates, emptySlot, fillWeek, inSeason, isPlanned, shoppingItems, shoppingText,
-  bringDeeplink, pendingLines, slotContent, slotKey, slugify, weekUsage,
+  bringDeeplink, mealFrom, pendingLines, sameMeal, slotContent, slotKey, slugify, weekUsage,
 } from '../js/planner.js';
 
 const seeded = (seed = 1) => () => {
@@ -169,4 +169,12 @@ test('Bring! export sends unchecked items through the script page', () => {
   assert.equal(link.origin + link.pathname, 'https://api.getbring.com/rest/bringrecipes/deeplink');
   assert.equal(link.searchParams.get('url'), page);
   assert.equal(link.searchParams.get('source'), 'web');
+});
+
+test('favorites match meals regardless of free item order and spelling', () => {
+  const slot = { ...emptySlot('2026-W44', 'lundi', 'soir'), legume: 'poireau', proteine: 'oeufs', autres: ['Crème fraîche', 'ciboulette'], nom: 'Quiche' };
+  const fav = { key: 'fav-1', nom: 'Quiche', ...mealFrom(slot) };
+  assert.deepEqual(Object.keys(mealFrom(slot)), ['legume', 'cuisson', 'proteine', 'feculent', 'autres']);
+  assert.ok(sameMeal(fav, { ...slot, autres: ['ciboulette', 'creme fraiche'] }));
+  assert.ok(!sameMeal(fav, { ...slot, feculent: 'pain' }));
 });

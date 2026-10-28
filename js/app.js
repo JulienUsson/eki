@@ -1,7 +1,7 @@
 import { AUTRE, DAYS, DEFAULT_CATALOG, FAMILLES, MEALS, MONTHS, SHOPPING_GROUPS, SHORT_MONTHS, SLOT_FIELDS, TYPES, groupInfo } from './data.js';
 import { dayLabel, shiftWeek, weekDates, weekId, weekLabel, weekMonth, weekNumber } from './dates.js';
 import {
-  buildCatalog, byType, cuissonCandidates, emptySlot, fillSlot, fillWeek, inSeason, isPlanned, parseItems,
+  buildCatalog, byType, cuissonCandidates, emptySlot, mealFrom, sameMeal, fillSlot, fillWeek, inSeason, isPlanned, parseItems,
   bringDeeplink, guessFamily, pendingLines, seasonalLegumes, shopKey, shoppingItems, shoppingText, slotContent, slugify, weekSlots, weekUsage,
 } from './planner.js';
 import { MIN_PLANNED, weekBalance } from './balance.js';
@@ -90,6 +90,16 @@ function slotSummary(slot) {
   return [...names, ...parseItems(slot?.autres)].join(' · ');
 }
 
+function favorites() {
+  return Object.values(store.table('Favoris'))
+    .filter((row) => !row.supprime)
+    .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+}
+
+function favoriteOf(slot) {
+  return favorites().find((fav) => sameMeal(fav, slot));
+}
+
 function reprisesOf(key) {
   return Object.values(store.table('Repas')).filter((row) => row.reprise === key && !row.libre);
 }
@@ -138,6 +148,7 @@ function renderWeek() {
   const dates = weekDates(ui.week);
   const slots = weekSlots(ui.week, meals, ids);
   const holes = slots.filter((s) => !s.libre && !s.reprise && SLOT_FIELDS.some((f) => !s[f])).length;
+  const hasFavorites = favorites().length > 0;
   const days = DAYS.map((day, i) => {
     const mealsHtml = ids.map((mealId) => {
       const slot = slots.find((s) => s.jour === day && s.repas === mealId);
@@ -150,7 +161,7 @@ function renderWeek() {
         const source = slotContent(slot, meals);
         body = `
           <button type="button" class="reprise" data-action="slot-menu" data-slot="${esc(slot.key)}">
-            <span>🔁 Restes de ${esc(slotLabel(slot.reprise).toLowerCase())}</span>
+            <span>🔁 Restes de ${esc(slotLabel(slot.reprise).toLowerCase())}${source?.nom ? ` : ${esc(source.nom)}` : ''}</span>
             <small>${source ? esc(slotSummary(source)) || 'repas pas encore choisi' : 'repas d’origine introuvable'}</small>
           </button>`;
       } else {
@@ -163,8 +174,9 @@ function renderWeek() {
       return `
         <div class="meal ${slot.libre ? 'is-libre' : ''} ${slot.reprise ? 'is-reprise' : ''}">
           <div class="meal-head">
-            <span class="meal-name">${meal.label}${twins.length ? `<span class="twin" title="Cuisiné en double">👯 aussi ${esc(twins.map((t) => slotLabel(t.key).toLowerCase()).join(', '))}</span>` : ''}</span>
+            <span class="meal-name">${meal.label}${slot.nom && !slot.libre && !slot.reprise ? `<span class="meal-title">${esc(slot.nom)}</span>` : ''}${twins.length ? `<span class="twin" title="Cuisiné en double">👯 aussi ${esc(twins.map((t) => slotLabel(t.key).toLowerCase()).join(', '))}</span>` : ''}</span>
             <span class="meal-tools">
+              ${slot.libre || slot.reprise || !hasFavorites ? '' : `<button type="button" class="icon-btn small" data-action="fav-pick" data-slot="${esc(slot.key)}" aria-label="Choisir un favori">⭐</button>`}
               ${slot.libre || slot.reprise ? '' : `<button type="button" class="icon-btn small" data-action="slot-dice" data-slot="${esc(slot.key)}" aria-label="Compléter ce repas au hasard">🎲</button>`}
               <button type="button" class="icon-btn small" data-action="slot-menu" data-slot="${esc(slot.key)}" aria-label="Options du repas">⋯</button>
             </span>
@@ -256,6 +268,12 @@ function renderSeason() {
         </details>` : ''}
     </section>
     ${['cuisson', 'proteine', 'feculent'].map(section).join('')}
+    <section class="block">
+      <h2>⭐ Repas favoris</h2>
+      ${favorites().length ? `<div class="tags">${favorites().map((fav) => `
+        <button type="button" class="tag" data-action="fav-edit" data-id="${esc(fav.key)}">⭐ ${esc(fav.nom)}</button>`).join('')}
+      </div>` : '<p class="hint">Sur le planning, ⋯ → « Enregistrer en favori » sur un repas que vous aimez.</p>'}
+    </section>
     ${deleted.length ? `
       <details class="more">
         <summary>Ingrédients masqués (${deleted.length})</summary>
@@ -332,7 +350,8 @@ function syncStatusText() {
   if (sync.status === 'error') return `⚠️ ${esc(sync.error)}`;
   const pending = store.pendingCount();
   const last = store.lastSync ? new Date(store.lastSync).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'jamais';
-  return `✅ Connecté · dernière synchro : ${last}${pending ? ` · ${pending} modification(s) en attente` : ''}`;
+  const outdated = sync.missing.length ? '<br>⚠️ Ton script Google n’est pas à jour : les favoris restent sur cet appareil. Copie le nouveau script puis <b>Déployer → Gérer les déploiements → Modifier → Nouvelle version</b>.' : '';
+  return `✅ Connecté · dernière synchro : ${last}${pending ? ` · ${pending} modification(s) en attente` : ''}${outdated}`;
 }
 
 function renderSettings() {
@@ -510,6 +529,14 @@ function slotMenu(key) {
   if (slot.reprise) {
     entries.push(item('slot-clear', '✂️ Ne plus reprendre ce repas'));
   } else if (!slot.libre) {
+    entries.push(item('fav-pick', '⭐ Choisir un repas favori…'));
+    if (isPlanned(slot)) {
+      const fav = favoriteOf(slot);
+      entries.push(fav
+        ? `<button type="button" class="menu-item" data-action="fav-edit" data-id="${esc(fav.key)}">⭐ Déjà en favori : ${esc(fav.nom)}</button>`
+        : item('fav-save', '⭐ Enregistrer en favori…'));
+      entries.push(item('slot-name', slot.nom ? `✏️ Renommer « ${esc(slot.nom)} »` : '✏️ Donner un nom à ce repas…'));
+    }
     if (isPlanned(slot)) entries.push(item('twin-pick', '👯 Cuisiner double : reprendre sur un autre créneau…'));
     entries.push(item('source-pick', '🔁 Manger les restes d’un autre repas…'));
     entries.push(item('slot-reroll', '🎲 Tout re-tirer au hasard'));
@@ -522,6 +549,42 @@ function slotMenu(key) {
       <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
     </div>
     <div class="menu">${entries.join('')}</div>`);
+}
+
+function favoritePicker(key) {
+  const list = favorites();
+  openSheet(`
+    <div class="sheet-head">
+      <h3>⭐ Repas favoris <small>${slotLabel(key)}</small></h3>
+      <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
+    </div>
+    ${list.length > 6 ? '<input type="search" class="search" placeholder="Rechercher…" data-input="fav-filter" autocomplete="off">' : ''}
+    <div class="menu options-scroll">${list.length ? list.map((fav) => `
+      <button type="button" class="menu-item fav-option" data-action="fav-apply" data-slot="${esc(key)}" data-id="${esc(fav.key)}" data-search="${esc(slugify(`${fav.nom} ${slotSummary(fav)}`))}">
+        <b>⭐ ${esc(fav.nom)}</b><small>${esc(slotSummary(fav))}</small>
+      </button>`).join('') : '<p class="hint">Aucun favori pour l’instant : sur un repas rempli, ⋯ → « Enregistrer en favori ».</p>'}
+    </div>`);
+}
+
+function nameSheet({ title, form, attrs, value, hint, extra = '' }) {
+  openSheet(`
+    <div class="sheet-head">
+      <h3>${title}</h3>
+      <button type="button" class="icon-btn" data-action="close-sheet" aria-label="Fermer">✕</button>
+    </div>
+    <form class="stack" data-form="${form}" ${attrs}>
+      <label>Nom
+        <input name="nom" value="${esc(value)}" autocomplete="off" enterkeyhint="done">
+      </label>
+      ${hint ? `<p class="hint">${hint}</p>` : ''}
+      <div class="toolbar">
+        <button type="submit" class="btn primary">Enregistrer</button>
+        ${extra}
+      </div>
+    </form>`);
+  const input = $sheet.querySelector('input[name="nom"]');
+  input.focus();
+  input.select();
 }
 
 function slotChoice(title, hint, action, from, candidates) {
@@ -797,12 +860,60 @@ const actions = {
     const slot = cleanSlot(slotOf(el.dataset.slot));
     const empty = SLOT_FIELDS.some((f) => !slot[f]);
     const counts = weekCounts(slot.semaine);
-    const base = empty ? slot : { ...slot, legume: '', cuisson: '', proteine: '', feculent: '' };
+    const base = empty ? slot : { ...slot, legume: '', cuisson: '', proteine: '', feculent: '', nom: '' };
     if (!empty) for (const f of SLOT_FIELDS) counts[f][slot[f]] -= 1;
     commit('Repas', fillSlot(base, catalog(), weekMonth(slot.semaine), counts, empty ? null : slot));
   },
   'slot-menu': (el) => slotMenu(el.dataset.slot),
   'twin-pick': (el) => twinPicker(el.dataset.slot),
+  'fav-pick': (el) => favoritePicker(el.dataset.slot),
+  'fav-apply': (el) => {
+    const fav = store.get('Favoris', el.dataset.id);
+    const slot = slotOf(el.dataset.slot);
+    if (!fav) return;
+    commit('Repas', { ...emptySlot(slot.semaine, slot.jour, slot.repas), ...mealFrom(fav), nom: fav.nom });
+    closeSheet();
+    toast(`⭐ ${fav.nom}`);
+  },
+  'fav-save': (el) => {
+    const slot = slotOf(el.dataset.slot);
+    nameSheet({
+      title: '⭐ Enregistrer en favori',
+      form: 'fav-save',
+      attrs: `data-slot="${esc(slot.key)}"`,
+      value: slot.nom || slotSummary(slot),
+      hint: esc(slotSummary(slot)),
+    });
+  },
+  'fav-edit': (el) => {
+    const fav = store.get('Favoris', el.dataset.id);
+    if (!fav) return;
+    nameSheet({
+      title: '⭐ Repas favori',
+      form: 'fav-edit',
+      attrs: `data-id="${esc(fav.key)}"`,
+      value: fav.nom,
+      hint: esc(slotSummary(fav)),
+      extra: '<button type="button" class="btn danger" data-action="fav-delete">Supprimer</button>',
+    });
+  },
+  'fav-delete': () => {
+    const form = $sheet.querySelector('form[data-form="fav-edit"]');
+    const fav = store.get('Favoris', form.dataset.id);
+    if (!fav || !confirm(`Supprimer le favori « ${fav.nom} » ?`)) return;
+    commit('Favoris', { ...fav, supprime: true });
+    closeSheet();
+  },
+  'slot-name': (el) => {
+    const slot = slotOf(el.dataset.slot);
+    nameSheet({
+      title: `✏️ ${slotLabel(slot.key)}`,
+      form: 'slot-name',
+      attrs: `data-slot="${esc(slot.key)}"`,
+      value: slot.nom,
+      hint: 'Laisse vide pour retirer le nom.',
+    });
+  },
   'source-pick': (el) => { ui.reprise = el.dataset.slot; sourcePicker(el.dataset.slot); },
   'twin-set': (el) => {
     const pickedSource = !el.dataset.from;
@@ -834,7 +945,7 @@ const actions = {
     const slot = cleanSlot(slotOf(el.dataset.slot));
     const counts = weekCounts(slot.semaine);
     for (const f of SLOT_FIELDS) if (slot[f]) counts[f][slot[f]] -= 1;
-    commit('Repas', fillSlot({ ...slot, legume: '', cuisson: '', proteine: '', feculent: '' }, catalog(), weekMonth(slot.semaine), counts, slot));
+    commit('Repas', fillSlot({ ...slot, legume: '', cuisson: '', proteine: '', feculent: '', nom: '' }, catalog(), weekMonth(slot.semaine), counts, slot));
     closeSheet();
   },
   'slot-clear': (el) => {
@@ -933,6 +1044,30 @@ const actions = {
 };
 
 const forms = {
+  'fav-save': (form) => {
+    const slot = cleanSlot(slotOf(form.dataset.slot));
+    const nom = form.nom.value.trim() || slotSummary(slot);
+    const key = `fav-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    commit('Favoris', { key, ...mealFrom(slot), nom, supprime: false });
+    commit('Repas', { ...slot, nom });
+    closeSheet();
+    toast(`⭐ « ${nom} » ajouté aux favoris`);
+  },
+  'fav-edit': (form) => {
+    const fav = store.get('Favoris', form.dataset.id);
+    const nom = form.nom.value.trim();
+    if (!fav || !nom) return;
+    const renamed = Object.values(store.table('Repas'))
+      .filter((row) => row.nom === fav.nom && sameMeal(row, fav))
+      .map((row) => ({ ...cleanSlot(row), nom }));
+    commit('Favoris', { ...cleanSlot(fav), nom });
+    if (renamed.length) commit('Repas', renamed);
+    closeSheet();
+  },
+  'slot-name': (form) => {
+    commit('Repas', { ...cleanSlot(slotOf(form.dataset.slot)), nom: form.nom.value.trim() });
+    closeSheet();
+  },
   autres: (form) => {
     commit('Repas', { ...cleanSlot(slotOf(form.dataset.slot)), autres: parseItems(form.autres.value) });
     closeSheet();
@@ -1031,6 +1166,11 @@ document.addEventListener('change', (event) => {
 });
 
 document.addEventListener('input', (event) => {
+  if (event.target.matches('[data-input="fav-filter"]')) {
+    const q = slugify(event.target.value);
+    for (const opt of $sheet.querySelectorAll('.fav-option')) opt.hidden = Boolean(q) && !opt.dataset.search.includes(q);
+    return;
+  }
   if (!event.target.matches('[data-input="filter"]')) return;
   const q = slugify(event.target.value);
   const options = [...$sheet.querySelectorAll('.options .option')];

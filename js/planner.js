@@ -90,6 +90,17 @@ export function emptySlot(week, day, meal) {
   };
 }
 
+export const MEAL_FIELDS = [...SLOT_FIELDS, 'autres'];
+
+export function sameMeal(a, b) {
+  const items = (value) => parseItems(value).map(slugify).sort().join('|');
+  return SLOT_FIELDS.every((f) => (a?.[f] ?? '') === (b?.[f] ?? '')) && items(a?.autres) === items(b?.autres);
+}
+
+export function mealFrom(source) {
+  return Object.fromEntries(MEAL_FIELDS.map((f) => [f, f === 'autres' ? parseItems(source?.autres) : source?.[f] ?? '']));
+}
+
 export function isPlanned(slot) {
   return !slot.libre && !slot.reprise && (SLOT_FIELDS.some((f) => slot[f]) || parseItems(slot.autres).length > 0);
 }

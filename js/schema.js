@@ -4,13 +4,16 @@ export const TABLES = {
   Repas: {
     semaine: 'text', jour: 'text', repas: 'text',
     legume: 'text', cuisson: 'text', proteine: 'text', feculent: 'text',
-    libre: 'bool', autres: 'items', reprise: 'text',
+    libre: 'bool', autres: 'items', reprise: 'text', nom: 'text',
   },
   Catalogue: {
     type: 'text', nom: 'text', emoji: 'text', mois: 'numbers', cuissons: 'list', famille: 'text', supprime: 'bool',
   },
   Courses: {
     semaine: 'text', article: 'text', coche: 'bool', extra: 'bool', supprime: 'bool',
+  },
+  Favoris: {
+    nom: 'text', legume: 'text', cuisson: 'text', proteine: 'text', feculent: 'text', autres: 'items', supprime: 'bool',
   },
 };
 
@@ -47,6 +50,10 @@ export function fromSheetRow(table, raw) {
   row.key = String(raw.key ?? '').trim() || (table === 'Catalogue' && row.nom ? slugify(row.nom) : '');
   row.updatedAt = Number(raw.updatedAt) || 0;
   return row;
+}
+
+export function missingTables(data = {}) {
+  return TABLE_NAMES.filter((table) => !Array.isArray(data?.[table]));
 }
 
 export function fromSheetData(data = {}) {

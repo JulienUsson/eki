@@ -264,6 +264,8 @@ select {
 .chip.empty { background: transparent; border: 1px dashed var(--border); color: var(--muted); }
 .chip-autre.empty { min-height: 0; padding: 2px 4px; border: 0; background: none; font-size: .85rem; }
 
+.meal-title { margin-left: 8px; text-transform: none; letter-spacing: 0; font-size: .95rem; font-weight: 600; color: var(--text); }
+
 .twin { margin-left: 8px; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--accent); }
 
 .reprise {

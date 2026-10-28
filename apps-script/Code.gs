@@ -2,7 +2,9 @@ const TOKEN = 'change-moi';
 
 const SHEET_ID = '';
 
-const TABLES = ['Repas', 'Catalogue', 'Courses'];
+const TABLES = ['Repas', 'Catalogue', 'Courses', 'Favoris'];
+
+const TABLE_NAME = /^[A-Z][A-Za-z]{1,30}$/;
 
 function setup() {
   const ss = spreadsheet_();
@@ -27,7 +29,7 @@ function doPost(e) {
     try {
       const changes = body.changes || {};
       Object.keys(changes).forEach(function (name) {
-        if (TABLES.indexOf(name) !== -1) upsert_(name, changes[name] || []);
+        if (TABLE_NAME.test(name)) upsert_(name, changes[name] || []);
       });
       SpreadsheetApp.flush();
     } finally {
@@ -117,7 +119,12 @@ function readTable_(name) {
 
 function readAll_() {
   const data = {};
-  TABLES.forEach(function (name) { data[name] = readTable_(name); });
+  const names = TABLES.slice();
+  spreadsheet_().getSheets().forEach(function (sheet) {
+    const name = sheet.getName();
+    if (TABLE_NAME.test(name) && names.indexOf(name) === -1) names.push(name);
+  });
+  names.forEach(function (name) { data[name] = readTable_(name); });
   return data;
 }
 

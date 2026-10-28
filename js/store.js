@@ -81,10 +81,12 @@ export class Store {
     return Object.fromEntries(TABLE_NAMES.map((t) => [t, Object.values(this.pending[t])]));
   }
 
-  applyRemote(tables, sent = null) {
-    this.base = { ...emptyTables(), ...tables };
+  applyRemote(tables, sent = null, missing = []) {
+    const kept = Object.fromEntries(missing.map((table) => [table, this.base[table]]));
+    this.base = { ...emptyTables(), ...tables, ...kept };
     if (sent) {
       for (const [table, rows] of Object.entries(sent)) {
+        if (missing.includes(table)) continue;
         for (const row of rows) {
           if (this.pending[table][row.key]?.updatedAt === row.updatedAt) delete this.pending[table][row.key];
         }

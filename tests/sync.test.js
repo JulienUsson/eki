@@ -19,6 +19,7 @@ function fakeServer() {
       const body = JSON.parse(init.body);
       if (body.token !== 'secret') return { ok: true, text: async () => JSON.stringify({ ok: false, error: 'Jeton invalide' }) };
       for (const [name, rows] of Object.entries(body.changes)) {
+        if (!tables[name]) continue;
         for (const row of rows) {
           const i = tables[name].findIndex((r) => r.key === row.key);
           if (i === -1) tables[name].push(row);
@@ -39,7 +40,7 @@ test('sheet row round trip', () => {
 });
 
 test('free ingredients keep their spaces in the sheet', () => {
-  const row = { key: 'w|lundi|soir', semaine: 'w', jour: 'lundi', repas: 'soir', legume: '', cuisson: '', proteine: '', feculent: '', libre: false, autres: ['sauce tomate', 'parmesan'], reprise: 'w|dimanche|soir', updatedAt: 3 };
+  const row = { key: 'w|lundi|soir', semaine: 'w', jour: 'lundi', repas: 'soir', legume: '', cuisson: '', proteine: '', feculent: '', libre: false, autres: ['sauce tomate', 'parmesan'], reprise: 'w|dimanche|soir', nom: '', updatedAt: 3 };
   const sheet = toSheetRow('Repas', row);
   assert.equal(sheet.autres, 'sauce tomate, parmesan');
   assert.deepEqual(fromSheetRow('Repas', sheet), row);
@@ -120,4 +121,21 @@ test('disconnecting keeps local data', () => {
   store.updateSettings({ url: '', token: '' });
   assert.equal(store.hasPending(), false);
   assert.equal(store.get('Courses', 'w|x:1').article, 'Pain');
+});
+
+test('favorites are kept locally while the deployed script does not know them', async () => {
+  const server = fakeServer();
+  const store = new Store(new MemoryStorage());
+  store.updateSettings({ url: 'https://script.google.com/macros/s/abc/exec', token: 'secret' });
+  store.put('Favoris', { key: 'fav-1', nom: 'Hachis', legume: '', cuisson: '', proteine: 'boeuf-hache', feculent: 'pommes-de-terre', autres: [], supprime: false });
+  const sync = new Sync(store, server.fetch);
+  await sync.run();
+  assert.deepEqual(sync.missing, ['Favoris']);
+  assert.equal(store.get('Favoris', 'fav-1').nom, 'Hachis');
+  assert.equal(store.pendingCount(), 1);
+  server.tables.Favoris = [];
+  await sync.run();
+  assert.deepEqual(sync.missing, []);
+  assert.equal(server.tables.Favoris[0].nom, 'Hachis');
+  assert.equal(store.pendingCount(), 0);
 });
